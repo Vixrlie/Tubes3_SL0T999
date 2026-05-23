@@ -59,3 +59,14 @@ export interface ScanResponse {
 	result?: DetectionResult;
 	error?: string;
 }
+
+export interface ScanTarget {
+	element: HTMLElement;
+	text: string;
+}
+
+export interface ContentPipelineState {
+	request: ScanRequest;
+	targets: ScanTarget[];
+	stats: PopupStats;
+}
