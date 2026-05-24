@@ -4,13 +4,6 @@ import { applyDetectionResult, clearHighlights } from './highlighter';
 import { collectScanTargets, readDocumentText } from './scanner';
 import { hideTooltip } from './tooltip';
 
-const initialStats: PopupStats = {
-  totalKeywords: 0,
-  exactMatches: 0,
-  regexMatches: 0,
-  fuzzyMatches: 0
-};
-
 function createRequest(): ScanRequest {
   return {
     url: location.href,
@@ -29,13 +22,7 @@ function buildPipelineState(): ContentPipelineState {
 
   return {
     request,
-    targets,
-    stats: {
-      totalKeywords: request.text.length > 0 ? 1 : 0,
-      exactMatches: 0,
-      regexMatches: 0,
-      fuzzyMatches: 0
-    }
+    targets
   };
 }
 
@@ -132,5 +119,3 @@ if (observerRoot) {
 }
 
 runScan();
-
-void initialStats;

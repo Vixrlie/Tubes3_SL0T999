@@ -13,6 +13,9 @@ function getTooltipElement(): HTMLDivElement {
 		tooltip.style.zIndex = '2147483647';
 		tooltip.style.pointerEvents = 'none';
 		tooltip.style.display = 'none';
+		tooltip.setAttribute('role', 'status');
+		tooltip.setAttribute('aria-live', 'polite');
+		tooltip.setAttribute('aria-hidden', 'true');
 		tooltip.style.padding = '8px 10px';
 		tooltip.style.borderRadius = '8px';
 		tooltip.style.background = 'rgba(15, 23, 42, 0.96)';
@@ -25,7 +28,7 @@ function getTooltipElement(): HTMLDivElement {
 	return tooltip;
 }
 
-export function renderTooltip(data: TooltipData): void {
+function setTooltipContent(data: TooltipData): void {
 	const tooltip = getTooltipElement();
 	tooltip.innerHTML = `
 		<strong>${data.keyword}</strong><br>
@@ -33,26 +36,38 @@ export function renderTooltip(data: TooltipData): void {
 		Kemunculan: ${data.occurrenceCount}<br>
 		Waktu: ${data.executionTimeMs.toFixed(2)} ms
 	`;
+}
+
+function positionTooltip(x: number, y: number): void {
+	const tooltip = getTooltipElement();
+	const padding = 12;
+	const width = tooltip.offsetWidth || 240;
+	const height = tooltip.offsetHeight || 80;
+	const left = Math.min(x + padding, Math.max(padding, window.innerWidth - width - padding));
+	const top = Math.min(y + padding, Math.max(padding, window.innerHeight - height - padding));
+
+	tooltip.style.left = `${left}px`;
+	tooltip.style.top = `${top}px`;
+}
+
+export function showTooltip(data: TooltipData, x: number, y: number): void {
+	const tooltip = getTooltipElement();
+	setTooltipContent(data);
+	positionTooltip(x, y);
 	tooltip.style.display = 'block';
+	tooltip.setAttribute('aria-hidden', 'false');
 }
 
 export function moveTooltip(x: number, y: number): void {
-	const tooltip = document.getElementById(TOOLTIP_ID);
-	if (!tooltip) {
-		return;
-	}
-
-	tooltip.style.left = `${x + 12}px`;
-	tooltip.style.top = `${y + 12}px`;
+	positionTooltip(x, y);
+	const tooltip = getTooltipElement();
+	tooltip.style.display = 'block';
 }
 
 export function hideTooltip(): void {
-	const tooltip = document.getElementById(TOOLTIP_ID);
-	if (!tooltip) {
-		return;
-	}
-
+	const tooltip = getTooltipElement();
 	tooltip.style.display = 'none';
+	tooltip.setAttribute('aria-hidden', 'true');
 }
 
 function handleTooltipMove(event: MouseEvent): void {
@@ -60,8 +75,7 @@ function handleTooltipMove(event: MouseEvent): void {
 }
 
 function handleTooltipEnter(data: TooltipData, event: MouseEvent): void {
-	renderTooltip(data);
-	moveTooltip(event.clientX, event.clientY);
+	showTooltip(data, event.clientX, event.clientY);
 }
 
 function handleTooltipLeave(): void {

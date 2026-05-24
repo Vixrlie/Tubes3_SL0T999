@@ -82,5 +82,4 @@ export interface ScanTarget {
 export interface ContentPipelineState {
 	request: ScanRequest;
 	targets: ScanTarget[];
-	stats: PopupStats;
 }
