@@ -1,5 +1,16 @@
 export type AlgorithmName = 'KMP' | 'BM' | 'Regex' | 'Fuzzy' | 'AhoCorasick' | 'RabinKarp';
 
+export interface DetectionContext {
+	url: string;
+	text: string;
+	timestamp: number;
+}
+
+export interface DetectionEngine {
+	name: AlgorithmName;
+	detect(context: DetectionContext): Promise<KeywordMatch[]> | KeywordMatch[];
+}
+
 export type MatchSource = 'exact' | 'regex' | 'fuzzy';
 
 export type MatchKind = 'keyword' | 'pattern' | 'image' | 'tooltip';
@@ -12,6 +23,7 @@ export interface KeywordMatch {
 	startIndex: number;
 	endIndex: number;
 	occurrenceCount: number;
+	targetIndex?: number;
 	comparisonCount?: number;
 	score?: number;
 	executionTimeMs?: number;
@@ -58,4 +70,16 @@ export interface ScanResponse {
 	ok: boolean;
 	result?: DetectionResult;
 	error?: string;
+}
+
+export interface ScanTarget {
+	element: HTMLElement;
+	text: string;
+	index: number;
+	tagName: string;
+}
+
+export interface ContentPipelineState {
+	request: ScanRequest;
+	targets: ScanTarget[];
 }
