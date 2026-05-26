@@ -165,6 +165,62 @@ body {
   letter-spacing: -0.08px;
 }
 
+.censorRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.censorLabel {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-ink);
+}
+
+.censorDesc {
+  font-size: 11px;
+  color: var(--color-ink-muted);
+  margin-top: 2px;
+}
+
+.toggle {
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.toggleInput {
+  display: none;
+}
+
+.toggleTrack {
+  display: flex;
+  align-items: center;
+  width: 44px;
+  height: 26px;
+  background: var(--color-hairline);
+  border-radius: 9999px;
+  padding: 3px;
+  transition: background 0.2s ease;
+}
+
+.toggleInput:checked + .toggleTrack {
+  background: var(--color-primary);
+}
+
+.toggleThumb {
+  width: 20px;
+  height: 20px;
+  background: #ffffff;
+  border-radius: 9999px;
+  transition: transform 0.2s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.toggleInput:checked + .toggleTrack .toggleThumb {
+  transform: translateX(18px);
+}
+
 .btnPrimary {
   padding: 6px 16px;
   background: var(--color-primary);

@@ -1,14 +1,27 @@
-import type { ContentPipelineState, DetectionContext, DetectionResult, PopupStats, ScanRequest, ScanResponse, ScanTarget } from '../types';
-import { runDetectionEnginesDetailed } from '../algorithms';
-import { applyDetectionResult, clearHighlights } from './highlighter';
-import { collectScanTargets, readDocumentText } from './scanner';
-import { hideTooltip } from './tooltip';
+import type {
+  ContentPipelineState,
+  DetectionContext,
+  DetectionResult,
+  PopupStats,
+  ScanRequest,
+  ScanResponse,
+  ScanTarget,
+} from "../types";
+import { runDetectionEnginesDetailed } from "../algorithms";
+import {
+  applyBlur,
+  applyDetectionResult,
+  clearHighlights,
+  removeBlur,
+} from "./highlighter";
+import { collectScanTargets, readDocumentText } from "./scanner";
+import { hideTooltip } from "./tooltip";
 
 function createRequest(): ScanRequest {
   return {
     url: location.href,
     text: readDocumentText(document.body ?? document),
-    timestamp: Date.now()
+    timestamp: Date.now(),
   };
 }
 
@@ -22,21 +35,35 @@ function buildPipelineState(): ContentPipelineState {
 
   return {
     request,
-    targets
+    targets,
   };
 }
 
-async function buildDetectionResult(request: ScanRequest, targets: ScanTarget[]): Promise<DetectionResult & { timings: { kmp: number; bm: number; regex: number; fuzzy: number } }> {
+async function buildDetectionResult(
+  request: ScanRequest,
+  targets: ScanTarget[],
+): Promise<
+  DetectionResult & {
+    timings: { kmp: number; bm: number; regex: number; fuzzy: number };
+  }
+> {
   const detectionContext: DetectionContext = {
     url: request.url,
     text: request.text,
     timestamp: request.timestamp,
-    targets
+    targets,
   };
-  const { matches, timings } = await runDetectionEnginesDetailed(detectionContext);
-  const exactMatches = matches.filter((match) => match.source === 'exact').length;
-  const regexMatches = matches.filter((match) => match.source === 'regex').length;
-  const fuzzyMatches = matches.filter((match) => match.source === 'fuzzy').length;
+  const { matches, timings } =
+    await runDetectionEnginesDetailed(detectionContext);
+  const exactMatches = matches.filter(
+    (match) => match.source === "exact",
+  ).length;
+  const regexMatches = matches.filter(
+    (match) => match.source === "regex",
+  ).length;
+  const fuzzyMatches = matches.filter(
+    (match) => match.source === "fuzzy",
+  ).length;
 
   return {
     matches,
@@ -46,7 +73,7 @@ async function buildDetectionResult(request: ScanRequest, targets: ScanTarget[])
     fuzzyMatches,
     scannedTextLength: request.text.length,
     executionTimeMs: timings.kmp + timings.bm + timings.regex + timings.fuzzy,
-    timings
+    timings,
   };
 }
 
@@ -55,10 +82,17 @@ async function runScan(): Promise<ScanResponse> {
   hideTooltip();
 
   const pipeline = buildPipelineState();
-  const detectionResult = await buildDetectionResult(pipeline.request, pipeline.targets);
+  const detectionResult = await buildDetectionResult(
+    pipeline.request,
+    pipeline.targets,
+  );
   applyDetectionResult(detectionResult, pipeline.targets);
-  const kmpMatches = detectionResult.matches.filter((m) => m.algorithm === 'KMP').length;
-  const bmMatches = detectionResult.matches.filter((m) => m.algorithm === 'BM').length;
+  const kmpMatches = detectionResult.matches.filter(
+    (m) => m.algorithm === "KMP",
+  ).length;
+  const bmMatches = detectionResult.matches.filter(
+    (m) => m.algorithm === "BM",
+  ).length;
   const stats: PopupStats = {
     totalKeywords: detectionResult.totalMatches,
     exactMatches: detectionResult.exactMatches,
@@ -70,27 +104,33 @@ async function runScan(): Promise<ScanResponse> {
     executionTimeMsBm: detectionResult.timings.bm,
     executionTimeMsRegex: detectionResult.timings.regex,
     executionTimeMsFuzzy: detectionResult.timings.fuzzy,
-    lastScanMs: detectionResult.executionTimeMs
+    lastScanMs: detectionResult.executionTimeMs,
   };
 
   persistStats(stats);
 
+  chrome.storage.local.get({ blurEnabled: false }, (items) => {
+    if (items["blurEnabled"]) applyBlur(document);
+  });
+
   return {
     ok: true,
     result: {
-      ...detectionResult
-    }
+      ...detectionResult,
+    },
   };
 }
 
-chrome.runtime.onMessage.addListener((message: unknown, _sender, sendResponse) => {
-  if (message === 'scan-now') {
-    void runScan().then((response) => sendResponse(response));
-    return true;
-  }
+chrome.runtime.onMessage.addListener(
+  (message: unknown, _sender, sendResponse) => {
+    if (message === "scan-now") {
+      void runScan().then((response) => sendResponse(response));
+      return true;
+    }
 
-  return false;
-});
+    return false;
+  },
+);
 
 let scanTimer: number | undefined;
 let internalMutation = false;
@@ -114,7 +154,14 @@ const observer = new MutationObserver((mutations) => {
     return;
   }
 
-  if (mutations.some((mutation) => mutation.addedNodes.length > 0 || mutation.removedNodes.length > 0 || mutation.type === 'characterData')) {
+  if (
+    mutations.some(
+      (mutation) =>
+        mutation.addedNodes.length > 0 ||
+        mutation.removedNodes.length > 0 ||
+        mutation.type === "characterData",
+    )
+  ) {
     scheduleScan();
   }
 });
@@ -125,8 +172,15 @@ if (observerRoot) {
   observer.observe(observerRoot, {
     childList: true,
     subtree: true,
-    characterData: true
+    characterData: true,
   });
 }
+
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area !== "local" || !("blurEnabled" in changes)) return;
+  const enabled = changes["blurEnabled"]?.newValue as boolean;
+  if (enabled) applyBlur(document);
+  else removeBlur(document);
+});
 
 runScan();

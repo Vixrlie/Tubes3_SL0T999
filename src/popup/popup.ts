@@ -17,11 +17,18 @@ if (typeof chrome === "undefined" || !chrome.storage) {
     lastScanMs: 2.0,
   };
 
+  const mockStorage: Record<string, unknown> = { ...mockStats, blurEnabled: false };
+
   (window as unknown as Record<string, unknown>)["chrome"] = {
     storage: {
       local: {
-        get: (_defaults: unknown, cb: (items: PopupStats) => void) =>
-          cb(mockStats),
+        get: (defaults: unknown, cb: (items: Record<string, unknown>) => void) => {
+          const keys = typeof defaults === 'object' && defaults !== null ? Object.keys(defaults) : [];
+          const result: Record<string, unknown> = {};
+          keys.forEach((k) => { result[k] = k in mockStorage ? mockStorage[k] : (defaults as Record<string, unknown>)[k]; });
+          cb(result);
+        },
+        set: (values: Record<string, unknown>) => { Object.assign(mockStorage, values); }
       },
       onChanged: { addListener: () => {} },
     },
@@ -158,6 +165,14 @@ document.addEventListener("DOMContentLoaded", () => {
       infoPanel?.setAttribute("hidden", "");
       btnInfo.classList.remove("active");
     }
+  });
+
+  const blurToggle = document.getElementById('toggle-blur') as HTMLInputElement | null;
+  chrome.storage.local.get({ blurEnabled: false }, (items) => {
+    if (blurToggle) blurToggle.checked = items['blurEnabled'] as boolean;
+  });
+  blurToggle?.addEventListener('change', () => {
+    chrome.storage.local.set({ blurEnabled: blurToggle.checked });
   });
 
   chrome.storage.onChanged.addListener((changes, area) => {
