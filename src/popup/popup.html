@@ -1,18 +1,136 @@
 <!doctype html>
 <html lang="en">
   <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Judol Detector</title>
   </head>
   <body>
-    <main id="app">
-      <section class="shell">
-        <p class="eyebrow">Judol Detector</p>
-        <h1>Scan status</h1>
-        <div id="stats" class="stats"></div>
+    <div id="app">
+      <header class="nav">
+        <div class="navBrand">
+          <img
+            src="/images/logo.png"
+            class="navIcon"
+            alt="Judol Detector logo"
+          />
+          <span class="navTitle">Judol Detector</span>
+        </div>
+        <div class="navActions">
+          <button
+            id="btn-info"
+            class="btnInfo"
+            type="button"
+            aria-label="About"
+          >
+            i
+          </button>
+          <button id="btn-scan" class="btnPrimary" type="button">
+            Scan Now
+          </button>
+        </div>
+      </header>
+
+      <div id="info-panel" class="infoPanel" hidden>
+        <p class="infoTitle">Kelompok SL0T999</p>
+        <ul class="infoList">
+          <li><span class="infoNim">13524031</span> Vincent Rionarlie</li>
+          <li><span class="infoNim">13524034</span> Jason Edward Salim</li>
+          <li>
+            <span class="infoNim">13524061</span> Muhammad Aufar Rizqi Kusuma
+          </li>
+        </ul>
+        <p class="infoCourse">IF2211 Strategi Algoritma - 2025/2026</p>
+      </div>
+
+      <section class="hero">
+        <p class="heroLabel">Keywords detected</p>
+        <p id="total-count" class="heroCount">-</p>
+        <p id="scan-meta" class="heroMeta">Loading…</p>
       </section>
-    </main>
+
+      <section class="section">
+        <h2 class="sectionTitle">Algorithm Breakdown</h2>
+
+        <div class="algoTable">
+          <div class="algoHeader">
+            <span>Algorithm</span>
+            <span>Matches</span>
+            <span>Time</span>
+          </div>
+
+          <div class="algoRow" id="row-kmp">
+            <span class="algoName">KMP</span>
+            <div class="barCell">
+              <div class="barTrack">
+                <div class="barFill" id="bar-kmp" style="width: 0%"></div>
+              </div>
+              <span class="barCount" id="count-kmp">0</span>
+            </div>
+            <span class="algoTime" id="time-kmp">-</span>
+          </div>
+
+          <div class="algoRow" id="row-bm">
+            <span class="algoName">Boyer-Moore</span>
+            <div class="barCell">
+              <div class="barTrack">
+                <div class="barFill" id="bar-bm" style="width: 0%"></div>
+              </div>
+              <span class="barCount" id="count-bm">0</span>
+            </div>
+            <span class="algoTime" id="time-bm">-</span>
+          </div>
+
+          <div class="algoRow" id="row-regex">
+            <span class="algoName">Regex</span>
+            <div class="barCell">
+              <div class="barTrack">
+                <div
+                  class="barFill barFillRegex"
+                  id="bar-regex"
+                  style="width: 0%"
+                ></div>
+              </div>
+              <span class="barCount" id="count-regex">0</span>
+            </div>
+            <span class="algoTime" id="time-regex">-</span>
+          </div>
+
+          <div class="algoRow" id="row-fuzzy">
+            <span class="algoName">Fuzzy</span>
+            <div class="barCell">
+              <div class="barTrack">
+                <div
+                  class="barFill barFillFuzzy"
+                  id="bar-fuzzy"
+                  style="width: 0%"
+                ></div>
+              </div>
+              <span class="barCount" id="count-fuzzy">0</span>
+            </div>
+            <span class="algoTime" id="time-fuzzy">-</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="section">
+        <h2 class="sectionTitle">Match Type</h2>
+        <div class="typeGrid">
+          <div class="typeCard">
+            <span class="typeLabel">Exact</span>
+            <strong id="count-exact" class="typeValue">0</strong>
+          </div>
+          <div class="typeCard">
+            <span class="typeLabel">Regex</span>
+            <strong id="count-regex-type" class="typeValue">0</strong>
+          </div>
+          <div class="typeCard">
+            <span class="typeLabel">Fuzzy</span>
+            <strong id="count-fuzzy-type" class="typeValue">0</strong>
+          </div>
+        </div>
+      </section>
+    </div>
     <script type="module" src="./popup.ts"></script>
   </body>
 </html>
