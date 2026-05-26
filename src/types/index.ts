@@ -4,6 +4,8 @@ export interface DetectionContext {
 	url: string;
 	text: string;
 	timestamp: number;
+	targets: ScanTarget[];
+	exactMatchedKeywords?: Set<string>;
 }
 
 export interface DetectionEngine {
