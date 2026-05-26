@@ -1,4 +1,4 @@
-import type { ContentPipelineState, DetectionContext, DetectionResult, PopupStats, ScanRequest, ScanResponse } from '../types';
+import type { ContentPipelineState, DetectionContext, DetectionResult, PopupStats, ScanRequest, ScanResponse, ScanTarget } from '../types';
 import { runDetectionEngines } from '../algorithms';
 import { applyDetectionResult, clearHighlights } from './highlighter';
 import { collectScanTargets, readDocumentText } from './scanner';
@@ -26,11 +26,12 @@ function buildPipelineState(): ContentPipelineState {
   };
 }
 
-async function buildDetectionResult(request: ScanRequest): Promise<DetectionResult> {
+async function buildDetectionResult(request: ScanRequest, targets: ScanTarget[]): Promise<DetectionResult> {
   const detectionContext: DetectionContext = {
     url: request.url,
     text: request.text,
-    timestamp: request.timestamp
+    timestamp: request.timestamp,
+    targets
   };
   const matches = await runDetectionEngines(detectionContext);
   const exactMatches = matches.filter((match) => match.source === 'exact').length;
@@ -53,7 +54,7 @@ async function runScan(): Promise<ScanResponse> {
   hideTooltip();
 
   const pipeline = buildPipelineState();
-  const detectionResult = await buildDetectionResult(pipeline.request);
+  const detectionResult = await buildDetectionResult(pipeline.request, pipeline.targets);
   applyDetectionResult(detectionResult, pipeline.targets);
   const stats: PopupStats = {
     totalKeywords: detectionResult.totalMatches,
