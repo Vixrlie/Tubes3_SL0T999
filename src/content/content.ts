@@ -178,6 +178,17 @@ chrome.runtime.onMessage.addListener(
 
 let scanTimer: number | undefined;
 let internalMutation = false;
+// Track recent scrolls to suppress mutation-triggered scans during active scrolling
+let lastScrollMs = 0;
+const SCROLL_SUPPRESSION_MS = 400; // milliseconds to suppress after a scroll event
+
+window.addEventListener(
+  "scroll",
+  () => {
+    lastScrollMs = Date.now();
+  },
+  { passive: true },
+);
 
 function scheduleScan(): void {
   if (scanTimer !== undefined) {
@@ -197,6 +208,10 @@ const observer = new MutationObserver((mutations) => {
   if (internalMutation) {
     return;
   }
+
+  // If a scroll just happened recently, skip handling mutations to avoid
+  // scheduling scans for layout-only/scroll-induced changes.
+  if (Date.now() - lastScrollMs < SCROLL_SUPPRESSION_MS) return;
 
   // If tooltip is visible (user interacting), avoid running scans to reduce noise.
   if (isTooltipVisible()) return;
