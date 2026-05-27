@@ -9,6 +9,9 @@
     "typecheck": "tsc --noEmit",
     "lint": "tsc --noEmit"
   },
+  "dependencies": {
+    "tesseract.js": "^6.0.1"
+  },
   "devDependencies": {
     "@types/chrome": "^0.0.314",
     "@types/node": "^25.9.1",

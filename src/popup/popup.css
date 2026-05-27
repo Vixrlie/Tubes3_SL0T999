@@ -38,7 +38,8 @@ body {
   width: 380px;
   min-height: 360px;
   background: var(--color-parchment);
-  color: var(--color-ink);
+  --color-accent-rk: #0ea5e9;
+  --color-accent-ocr: #d946ef;
   font-family: var(--font-text);
   font-size: 14px;
   line-height: 1.4;
@@ -46,6 +47,10 @@ body {
 }
 
 #app {
+
+.barFillOcr {
+  background: linear-gradient(90deg, var(--color-accent-ocr), #f0abfc);
+}
   display: flex;
   flex-direction: column;
   gap: 1px;

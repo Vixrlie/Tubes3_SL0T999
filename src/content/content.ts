@@ -14,7 +14,8 @@ import {
   clearHighlights,
   removeBlur,
 } from "./highlighter";
-import { collectScanTargets, readDocumentText } from "./scanner";
+import { collectImageTargets, collectScanTargets, readDocumentText } from "./scanner";
+import { runOcrDetection } from "./ocr";
 import { hideTooltip, isTooltipVisible } from "./tooltip";
 
 function createRequest(): ScanRequest {
@@ -32,14 +33,16 @@ function persistStats(stats: PopupStats): void {
 function buildPipelineState(): ContentPipelineState {
   const request = createRequest();
   const targets = collectScanTargets(document);
+  const imageTargets = collectImageTargets(document, targets.length);
 
   return {
     request,
     targets,
+    imageTargets,
   };
 }
 
-async function buildDetectionResult(
+async function buildTextDetectionResult(
   request: ScanRequest,
   targets: ScanTarget[],
 ): Promise<
@@ -90,43 +93,61 @@ async function buildDetectionResult(
   };
 }
 
-async function runScan(): Promise<ScanResponse> {
+async function runScan(includeOcr = false): Promise<ScanResponse> {
   clearHighlights(document);
   hideTooltip();
 
   const pipeline = buildPipelineState();
-  const detectionResult = await buildDetectionResult(
+  const textDetectionResult = await buildTextDetectionResult(
     pipeline.request,
     pipeline.targets,
   );
-  applyDetectionResult(detectionResult, pipeline.targets);
-  const kmpMatches = detectionResult.matches.filter(
+  const imageTargets = includeOcr ? pipeline.imageTargets ?? [] : [];
+  const ocrResult = includeOcr && imageTargets.length > 0
+    ? await runOcrDetection(imageTargets)
+    : { matches: [], executionTimeMs: 0 };
+  const combinedMatches = [...textDetectionResult.matches, ...ocrResult.matches];
+  const combinedTargets = [...pipeline.targets, ...imageTargets];
+
+  const detectionResult: DetectionResult = {
+    ...textDetectionResult,
+    matches: combinedMatches,
+    totalMatches: combinedMatches.length,
+    scannedTextLength: textDetectionResult.scannedTextLength,
+    executionTimeMs: textDetectionResult.executionTimeMs + ocrResult.executionTimeMs,
+  };
+
+  applyDetectionResult(detectionResult, combinedTargets);
+  const kmpMatches = textDetectionResult.matches.filter(
     (m) => m.algorithm === "KMP",
   ).length;
-  const bmMatches = detectionResult.matches.filter(
+  const bmMatches = textDetectionResult.matches.filter(
     (m) => m.algorithm === "BM",
   ).length;
-  const ahoCorasickMatches = detectionResult.matches.filter(
+  const ahoCorasickMatches = textDetectionResult.matches.filter(
     (m) => m.algorithm === "AhoCorasick",
   ).length;
-  const rabinKarpMatches = detectionResult.matches.filter(
+  const rabinKarpMatches = textDetectionResult.matches.filter(
     (m) => m.algorithm === "RabinKarp",
   ).length;
+  const ocrMatches = ocrResult.matches.length;
   const stats: PopupStats = {
     totalKeywords: detectionResult.totalMatches,
-    exactMatches: detectionResult.exactMatches,
-    regexMatches: detectionResult.regexMatches,
-    fuzzyMatches: detectionResult.fuzzyMatches,
+    exactMatches: textDetectionResult.exactMatches,
+    regexMatches: textDetectionResult.regexMatches,
+    fuzzyMatches: textDetectionResult.fuzzyMatches,
+    ocrMatches,
     kmpMatches,
     bmMatches,
     ahoCorasickMatches,
     rabinKarpMatches,
-    executionTimeMsKmp: detectionResult.timings.kmp,
-    executionTimeMsBm: detectionResult.timings.bm,
-    executionTimeMsAhoCorasick: detectionResult.timings.ahoCorasick,
-    executionTimeMsRabinKarp: detectionResult.timings.rabinKarp,
-    executionTimeMsRegex: detectionResult.timings.regex,
-    executionTimeMsFuzzy: detectionResult.timings.fuzzy,
+    executionTimeMsKmp: textDetectionResult.timings.kmp,
+    executionTimeMsBm: textDetectionResult.timings.bm,
+    executionTimeMsAhoCorasick: textDetectionResult.timings.ahoCorasick,
+    executionTimeMsRabinKarp: textDetectionResult.timings.rabinKarp,
+    executionTimeMsOcr: ocrResult.executionTimeMs,
+    executionTimeMsRegex: textDetectionResult.timings.regex,
+    executionTimeMsFuzzy: textDetectionResult.timings.fuzzy,
     lastScanMs: detectionResult.executionTimeMs,
   };
 
@@ -147,7 +168,7 @@ async function runScan(): Promise<ScanResponse> {
 chrome.runtime.onMessage.addListener(
   (message: unknown, _sender, sendResponse) => {
     if (message === "scan-now") {
-      void runScan().then((response) => sendResponse(response));
+      void runScan(true).then((response) => sendResponse(response));
       return true;
     }
 
@@ -165,7 +186,7 @@ function scheduleScan(): void {
 
   scanTimer = window.setTimeout(() => {
     internalMutation = true;
-    void runScan();
+    void runScan(false);
     window.setTimeout(() => {
       internalMutation = false;
     }, 0);
@@ -220,4 +241,4 @@ chrome.storage.onChanged.addListener((changes, area) => {
   else removeBlur(document);
 });
 
-runScan();
+void runScan(true);
