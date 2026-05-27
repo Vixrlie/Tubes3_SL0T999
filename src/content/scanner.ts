@@ -32,6 +32,12 @@ function isSkippableElement(element: Element): boolean {
 	return SKIPPABLE_TAG_NAMES.has(element.tagName);
 }
 
+function isInsideJudolUi(node: Node | null): boolean {
+	if (!node) return false;
+	if (node instanceof Element) return node.closest('[data-judol-ui]') !== null;
+	return node.parentElement?.closest('[data-judol-ui]') !== undefined && node.parentElement?.closest('[data-judol-ui]') !== null;
+}
+
 function isVisibleElement(element: HTMLElement): boolean {
 	const computedStyle = window.getComputedStyle(element);
 	return computedStyle.display !== 'none' && computedStyle.visibility !== 'hidden' && computedStyle.opacity !== '0';
@@ -42,11 +48,16 @@ function isMeaningfulTextParent(element: Element): element is HTMLElement {
 		return false;
 	}
 
-	if (isSkippableElement(element)) {
+    if (isSkippableElement(element)) {
 		return false;
 	}
 
 	if (!isVisibleElement(element)) {
+		return false;
+	}
+
+	// Skip any elements that are part of the extension's UI (tooltip etc.)
+	if (isInsideJudolUi(element)) {
 		return false;
 	}
 
@@ -60,6 +71,9 @@ function selectTextContainer(node: Text): HTMLElement | null {
 		if (isSkippableElement(currentElement) || !isVisibleElement(currentElement)) {
 			return null;
 		}
+
+		// Don't select containers that are part of our UI
+		if (isInsideJudolUi(currentElement)) return null;
 
 		const text = normalizeText(currentElement.textContent ?? '');
 		if (text.length === 0) {
@@ -94,6 +108,12 @@ export function collectScanTargets(root: ParentNode = document): ScanTarget[] {
 		if (currentNode instanceof Text) {
 			const text = normalizeText(currentNode.nodeValue ?? '');
 			const parentElement = selectTextContainer(currentNode);
+
+			// skip text nodes that are inside extension UI
+			if (isInsideJudolUi(currentNode)) {
+				currentNode = walker.nextNode();
+				continue;
+			}
 
 			if (text.length > 0 && parentElement && isMeaningfulTextParent(parentElement) && !seenElements.has(parentElement)) {
 				seenElements.add(parentElement);

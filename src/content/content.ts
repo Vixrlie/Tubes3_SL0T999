@@ -15,7 +15,7 @@ import {
   removeBlur,
 } from "./highlighter";
 import { collectScanTargets, readDocumentText } from "./scanner";
-import { hideTooltip } from "./tooltip";
+import { hideTooltip, isTooltipVisible } from "./tooltip";
 
 function createRequest(): ScanRequest {
   return {
@@ -154,16 +154,30 @@ const observer = new MutationObserver((mutations) => {
     return;
   }
 
-  if (
-    mutations.some(
-      (mutation) =>
-        mutation.addedNodes.length > 0 ||
-        mutation.removedNodes.length > 0 ||
-        mutation.type === "characterData",
-    )
-  ) {
-    scheduleScan();
-  }
+  // If tooltip is visible (user interacting), avoid running scans to reduce noise.
+  if (isTooltipVisible()) return;
+
+  // Ignore mutations that are entirely inside our own UI (tooltip, overlays).
+  const relevant = mutations.some((mutation) => {
+    // If any added/removed node is not part of our UI, it's relevant.
+    const added = Array.from(mutation.addedNodes).some((n) => {
+      if (n instanceof Element) return n.closest('[data-judol-ui]') === null;
+      if (n.parentElement) return n.parentElement.closest('[data-judol-ui]') === null;
+      return true;
+    });
+
+    const removed = Array.from(mutation.removedNodes).some((n) => {
+      if (n instanceof Element) return n.closest('[data-judol-ui]') === null;
+      if (n.parentElement) return n.parentElement.closest('[data-judol-ui]') === null;
+      return true;
+    });
+
+    const charDataRelevant = mutation.type === 'characterData' && (mutation.target instanceof Node) && (mutation.target instanceof Element ? mutation.target.closest('[data-judol-ui]') === null : mutation.target.parentElement?.closest('[data-judol-ui]') === null);
+
+    return added || removed || charDataRelevant;
+  });
+
+  if (relevant) scheduleScan();
 });
 
 const observerRoot = document.body ?? document.documentElement;

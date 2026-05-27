@@ -17,10 +17,40 @@ function storeOriginalOutline(element: HTMLElement): void {
   }
 }
 
+function storeOriginalBlurState(element: HTMLElement): void {
+  if (!element.dataset.originalFilter) {
+    element.dataset.originalFilter = element.style.filter;
+  }
+
+  if (!element.dataset.originalUserSelect) {
+    element.dataset.originalUserSelect = element.style.userSelect;
+  }
+
+  if (!element.dataset.originalAriaHidden) {
+    element.dataset.originalAriaHidden = element.getAttribute("aria-hidden") ?? "";
+  }
+}
+
+function restoreOriginalBlurState(element: HTMLElement): void {
+  element.style.filter = element.dataset.originalFilter ?? "";
+  element.style.userSelect = element.dataset.originalUserSelect ?? "";
+
+  const originalAriaHidden = element.dataset.originalAriaHidden ?? "";
+  if (originalAriaHidden.length > 0) {
+    element.setAttribute("aria-hidden", originalAriaHidden);
+  } else {
+    element.removeAttribute("aria-hidden");
+  }
+
+  delete element.dataset.originalFilter;
+  delete element.dataset.originalUserSelect;
+  delete element.dataset.originalAriaHidden;
+}
+
 function clearElementState(element: HTMLElement): void {
   const originalOutline = element.dataset.originalOutline ?? "";
   element.style.outline = originalOutline;
-  element.style.filter = "";
+  restoreOriginalBlurState(element);
   element.classList.remove(HIGHLIGHT_CLASS);
   element.removeAttribute(HIGHLIGHT_ATTRIBUTE);
   delete element.dataset.originalOutline;
@@ -43,7 +73,12 @@ export function applyBlur(root: ParentNode = document): void {
   root
     .querySelectorAll<HTMLElement>(`[${HIGHLIGHT_ATTRIBUTE}="true"]`)
     .forEach((el) => {
-      el.style.filter = blurStyle;
+      storeOriginalBlurState(el);
+
+      const originalFilter = el.dataset.originalFilter ?? "";
+      el.style.filter = `${originalFilter} ${blurStyle}`.trim();
+      el.style.userSelect = "none";
+      el.setAttribute("aria-hidden", "true");
     });
 }
 
@@ -51,7 +86,7 @@ export function removeBlur(root: ParentNode = document): void {
   root
     .querySelectorAll<HTMLElement>(`[${HIGHLIGHT_ATTRIBUTE}="true"]`)
     .forEach((el) => {
-      el.style.filter = "";
+      restoreOriginalBlurState(el);
     });
 }
 

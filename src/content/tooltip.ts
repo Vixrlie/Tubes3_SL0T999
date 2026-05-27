@@ -16,6 +16,10 @@ function getTooltipElement(): HTMLDivElement {
 		tooltip.setAttribute('role', 'status');
 		tooltip.setAttribute('aria-live', 'polite');
 		tooltip.setAttribute('aria-hidden', 'true');
+		// Mark tooltip as internal UI so observers/scanners can ignore it
+		tooltip.setAttribute('data-judol-ui', 'true');
+		// Ensure it doesn't interfere with pointer events or keyboard
+		tooltip.style.pointerEvents = 'none';
 		tooltip.style.padding = '8px 10px';
 		tooltip.style.borderRadius = '8px';
 		tooltip.style.background = 'rgba(15, 23, 42, 0.96)';
@@ -68,6 +72,11 @@ export function hideTooltip(): void {
 	const tooltip = getTooltipElement();
 	tooltip.style.display = 'none';
 	tooltip.setAttribute('aria-hidden', 'true');
+}
+
+export function isTooltipVisible(): boolean {
+    const tooltip = document.getElementById(TOOLTIP_ID) as HTMLDivElement | null;
+    return !!(tooltip && tooltip.style.display && tooltip.style.display !== 'none');
 }
 
 function handleTooltipMove(event: MouseEvent): void {
