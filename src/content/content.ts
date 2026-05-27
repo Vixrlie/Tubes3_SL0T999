@@ -15,7 +15,7 @@ import {
   removeBlur,
 } from "./highlighter";
 import { collectImageTargets, collectScanTargets, readDocumentText } from "./scanner";
-import { runOcrDetection } from "./ocr";
+import { runOcrDetection, warmupOcrWorker } from "./ocr";
 import { hideTooltip, isTooltipVisible } from "./tooltip";
 
 function createRequest(): ScanRequest {
@@ -256,4 +256,21 @@ chrome.storage.onChanged.addListener((changes, area) => {
   else removeBlur(document);
 });
 
-void runScan(true);
+void warmupOcrWorker();
+
+function startInitialScan(): void {
+  if (document.readyState === "complete") {
+    void runScan(true);
+    return;
+  }
+
+  window.addEventListener(
+    "load",
+    () => {
+      void runScan(true);
+    },
+    { once: true },
+  );
+}
+
+startInitialScan();
