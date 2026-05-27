@@ -74,6 +74,11 @@ export function hideTooltip(): void {
 	tooltip.setAttribute('aria-hidden', 'true');
 }
 
+export function isTooltipVisible(): boolean {
+    const tooltip = document.getElementById(TOOLTIP_ID) as HTMLDivElement | null;
+    return !!(tooltip && tooltip.style.display && tooltip.style.display !== 'none');
+}
+
 function handleTooltipMove(event: MouseEvent): void {
 	moveTooltip(event.clientX, event.clientY);
 }

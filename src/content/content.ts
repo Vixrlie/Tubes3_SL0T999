@@ -15,7 +15,7 @@ import {
   removeBlur,
 } from "./highlighter";
 import { collectScanTargets, readDocumentText } from "./scanner";
-import { hideTooltip } from "./tooltip";
+import { hideTooltip, isTooltipVisible } from "./tooltip";
 
 function createRequest(): ScanRequest {
   return {
@@ -153,6 +153,9 @@ const observer = new MutationObserver((mutations) => {
   if (internalMutation) {
     return;
   }
+
+  // If tooltip is visible (user interacting), avoid running scans to reduce noise.
+  if (isTooltipVisible()) return;
 
   // Ignore mutations that are entirely inside our own UI (tooltip, overlays).
   const relevant = mutations.some((mutation) => {
