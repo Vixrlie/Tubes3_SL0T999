@@ -44,7 +44,14 @@ async function buildDetectionResult(
   targets: ScanTarget[],
 ): Promise<
   DetectionResult & {
-    timings: { kmp: number; bm: number; regex: number; fuzzy: number };
+    timings: {
+      kmp: number;
+      bm: number;
+      ahoCorasick: number;
+      rabinKarp: number;
+      regex: number;
+      fuzzy: number;
+    };
   }
 > {
   const detectionContext: DetectionContext = {
@@ -72,7 +79,13 @@ async function buildDetectionResult(
     regexMatches,
     fuzzyMatches,
     scannedTextLength: request.text.length,
-    executionTimeMs: timings.kmp + timings.bm + timings.regex + timings.fuzzy,
+    executionTimeMs:
+      timings.kmp +
+      timings.bm +
+      timings.ahoCorasick +
+      timings.rabinKarp +
+      timings.regex +
+      timings.fuzzy,
     timings,
   };
 }
@@ -93,6 +106,12 @@ async function runScan(): Promise<ScanResponse> {
   const bmMatches = detectionResult.matches.filter(
     (m) => m.algorithm === "BM",
   ).length;
+  const ahoCorasickMatches = detectionResult.matches.filter(
+    (m) => m.algorithm === "AhoCorasick",
+  ).length;
+  const rabinKarpMatches = detectionResult.matches.filter(
+    (m) => m.algorithm === "RabinKarp",
+  ).length;
   const stats: PopupStats = {
     totalKeywords: detectionResult.totalMatches,
     exactMatches: detectionResult.exactMatches,
@@ -100,8 +119,12 @@ async function runScan(): Promise<ScanResponse> {
     fuzzyMatches: detectionResult.fuzzyMatches,
     kmpMatches,
     bmMatches,
+    ahoCorasickMatches,
+    rabinKarpMatches,
     executionTimeMsKmp: detectionResult.timings.kmp,
     executionTimeMsBm: detectionResult.timings.bm,
+    executionTimeMsAhoCorasick: detectionResult.timings.ahoCorasick,
+    executionTimeMsRabinKarp: detectionResult.timings.rabinKarp,
     executionTimeMsRegex: detectionResult.timings.regex,
     executionTimeMsFuzzy: detectionResult.timings.fuzzy,
     lastScanMs: detectionResult.executionTimeMs,

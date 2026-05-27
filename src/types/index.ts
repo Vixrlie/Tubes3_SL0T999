@@ -55,8 +55,12 @@ export interface PopupStats {
 	fuzzyMatches: number;
 	kmpMatches: number;
 	bmMatches: number;
+	ahoCorasickMatches: number;
+	rabinKarpMatches: number;
 	executionTimeMsKmp: number;
 	executionTimeMsBm: number;
+	executionTimeMsAhoCorasick: number;
+	executionTimeMsRabinKarp: number;
 	executionTimeMsRegex: number;
 	executionTimeMsFuzzy: number;
 	lastScanMs: number;

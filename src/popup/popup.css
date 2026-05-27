@@ -7,6 +7,8 @@
   --color-primary: #0066cc;
   --color-primary-hover: #0071e3;
   --color-accent-exact: #0066cc;
+  --color-accent-aho: #7c3aed;
+  --color-accent-rk: #0ea5e9;
   --color-accent-regex: #34c759;
   --color-accent-fuzzy: #ff9500;
   --color-hairline: #d2d2d7;
@@ -365,6 +367,12 @@ body {
 
 .barFillRegex {
   background: var(--color-accent-regex);
+}
+.barFillAho {
+  background: var(--color-accent-aho);
+}
+.barFillRk {
+  background: var(--color-accent-rk);
 }
 .barFillFuzzy {
   background: var(--color-accent-fuzzy);

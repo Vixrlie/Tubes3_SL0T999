@@ -10,8 +10,12 @@ if (typeof chrome === "undefined" || !chrome.storage) {
     fuzzyMatches: 1,
     kmpMatches: 8,
     bmMatches: 7,
+    ahoCorasickMatches: 4,
+    rabinKarpMatches: 2,
     executionTimeMsKmp: 0.42,
     executionTimeMsBm: 0.31,
+    executionTimeMsAhoCorasick: 0.24,
+    executionTimeMsRabinKarp: 0.19,
     executionTimeMsRegex: 0.08,
     executionTimeMsFuzzy: 1.19,
     lastScanMs: 2.0,
@@ -47,8 +51,12 @@ const defaultStats: PopupStats = {
   fuzzyMatches: 0,
   kmpMatches: 0,
   bmMatches: 0,
+  ahoCorasickMatches: 0,
+  rabinKarpMatches: 0,
   executionTimeMsKmp: 0,
   executionTimeMsBm: 0,
+  executionTimeMsAhoCorasick: 0,
+  executionTimeMsRabinKarp: 0,
   executionTimeMsRegex: 0,
   executionTimeMsFuzzy: 0,
   lastScanMs: 0,
@@ -85,6 +93,8 @@ function renderStats(stats: PopupStats): void {
   const counts = [
     stats.kmpMatches,
     stats.bmMatches,
+    stats.ahoCorasickMatches,
+    stats.rabinKarpMatches,
     stats.regexMatches,
     stats.fuzzyMatches,
   ];
@@ -92,16 +102,22 @@ function renderStats(stats: PopupStats): void {
 
   setText("count-kmp", String(stats.kmpMatches));
   setText("count-bm", String(stats.bmMatches));
+  setText("count-aho", String(stats.ahoCorasickMatches));
+  setText("count-rk", String(stats.rabinKarpMatches));
   setText("count-regex", String(stats.regexMatches));
   setText("count-fuzzy", String(stats.fuzzyMatches));
 
   setBarWidth("bar-kmp", (stats.kmpMatches / maxCount) * 100);
   setBarWidth("bar-bm", (stats.bmMatches / maxCount) * 100);
+  setBarWidth("bar-aho", (stats.ahoCorasickMatches / maxCount) * 100);
+  setBarWidth("bar-rk", (stats.rabinKarpMatches / maxCount) * 100);
   setBarWidth("bar-regex", (stats.regexMatches / maxCount) * 100);
   setBarWidth("bar-fuzzy", (stats.fuzzyMatches / maxCount) * 100);
 
   setText("time-kmp", formatMs(stats.executionTimeMsKmp));
   setText("time-bm", formatMs(stats.executionTimeMsBm));
+  setText("time-aho", formatMs(stats.executionTimeMsAhoCorasick));
+  setText("time-rk", formatMs(stats.executionTimeMsRabinKarp));
   setText("time-regex", formatMs(stats.executionTimeMsRegex));
   setText("time-fuzzy", formatMs(stats.executionTimeMsFuzzy));
 
