@@ -87,19 +87,20 @@ export function createRabinKarpEngine(): DetectionEngine {
 						continue;
 					}
 
-					const startIndex = positions[0];
-					const endIndex = startIndex + normalizedKeyword.length;
-					matches.push({
-						keyword: normalizedKeyword,
-						matchedText: text.slice(startIndex, endIndex),
-						algorithm: 'RabinKarp',
-						source: 'exact',
-						startIndex,
-						endIndex,
-						occurrenceCount: positions.length,
-						targetIndex: target.index,
-						comparisonCount: comparisons
-					});
+					for (const startIndex of positions) {
+						const endIndex = startIndex + normalizedKeyword.length;
+						matches.push({
+							keyword: normalizedKeyword,
+							matchedText: text.slice(startIndex, endIndex),
+							algorithm: 'RabinKarp',
+							source: 'exact',
+							startIndex,
+							endIndex,
+							occurrenceCount: positions.length,
+							targetIndex: target.index,
+							comparisonCount: comparisons
+						});
+					}
 				}
 			}
 
