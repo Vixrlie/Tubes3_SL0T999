@@ -92,7 +92,7 @@ export function createAhoCorasickEngine(): DetectionEngine {
 				}
 
 				const lowerText = text.toLowerCase();
-				const perKeyword = new Map<string, { count: number; firstIndex: number }>();
+				const perKeyword = new Map<string, number[]>();
 				let node = root;
 				let comparisons = 0;
 
@@ -114,30 +114,31 @@ export function createAhoCorasickEngine(): DetectionEngine {
 						for (const keyword of node.outputs) {
 							const endIndex = index + 1;
 							const startIndex = endIndex - keyword.length;
-							const entry = perKeyword.get(keyword);
-							if (entry) {
-								entry.count += 1;
+							const occurrences = perKeyword.get(keyword);
+							if (occurrences) {
+								occurrences.push(startIndex);
 							} else {
-								perKeyword.set(keyword, { count: 1, firstIndex: startIndex });
+								perKeyword.set(keyword, [startIndex]);
 							}
 						}
 					}
 				}
 
-				perKeyword.forEach((entry, keyword) => {
-					const startIndex = entry.firstIndex;
-					const endIndex = startIndex + keyword.length;
-					matches.push({
-						keyword,
-						matchedText: text.slice(startIndex, endIndex),
-						algorithm: 'AhoCorasick',
-						source: 'exact',
-						startIndex,
-						endIndex,
-						occurrenceCount: entry.count,
-						targetIndex: target.index,
-						comparisonCount: comparisons
-					});
+				perKeyword.forEach((occurrences, keyword) => {
+					for (const startIndex of occurrences) {
+						const endIndex = startIndex + keyword.length;
+						matches.push({
+							keyword,
+							matchedText: text.slice(startIndex, endIndex),
+							algorithm: 'AhoCorasick',
+							source: 'exact',
+							startIndex,
+							endIndex,
+							occurrenceCount: occurrences.length,
+							targetIndex: target.index,
+							comparisonCount: comparisons
+						});
+					}
 				});
 			}
 
