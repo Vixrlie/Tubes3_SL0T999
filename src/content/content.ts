@@ -14,7 +14,8 @@ import {
   clearHighlights,
   removeBlur,
 } from "./highlighter";
-import { collectScanTargets, readDocumentText } from "./scanner";
+import { collectImageTargets, collectScanTargets, readDocumentText } from "./scanner";
+import { runOcrDetection, warmupOcrWorker } from "./ocr.ts";
 import { hideTooltip, isTooltipVisible } from "./tooltip";
 
 function createRequest(): ScanRequest {
@@ -32,14 +33,16 @@ function persistStats(stats: PopupStats): void {
 function buildPipelineState(): ContentPipelineState {
   const request = createRequest();
   const targets = collectScanTargets(document);
+  const imageTargets = collectImageTargets(document, targets.length);
 
   return {
     request,
     targets,
+    imageTargets,
   };
 }
 
-async function buildDetectionResult(
+async function buildTextDetectionResult(
   request: ScanRequest,
   targets: ScanTarget[],
 ): Promise<
@@ -90,43 +93,75 @@ async function buildDetectionResult(
   };
 }
 
-async function runScan(): Promise<ScanResponse> {
+async function runScan(includeOcr = false): Promise<ScanResponse> {
   clearHighlights(document);
   hideTooltip();
 
+  if (includeOcr) {
+    console.debug('[JudolDetector][auto-scan] OCR enabled, collecting image targets...');
+  }
+
   const pipeline = buildPipelineState();
-  const detectionResult = await buildDetectionResult(
+  const textDetectionResult = await buildTextDetectionResult(
     pipeline.request,
     pipeline.targets,
   );
-  applyDetectionResult(detectionResult, pipeline.targets);
-  const kmpMatches = detectionResult.matches.filter(
+  const imageTargets = includeOcr ? pipeline.imageTargets ?? [] : [];
+  if (includeOcr) {
+    console.debug('[JudolDetector][auto-scan] image targets found:', imageTargets.length);
+  }
+  const ocrResult = includeOcr && imageTargets.length > 0
+    ? await runOcrDetection(imageTargets)
+    : { matches: [], executionTimeMs: 0 };
+  if (includeOcr) {
+    console.debug('[JudolDetector][auto-scan] OCR result:', {
+      imageTargets: imageTargets.length,
+      ocrMatches: ocrResult.matches.length,
+      executionTimeMs: ocrResult.executionTimeMs,
+    });
+  }
+  const combinedMatches = [...textDetectionResult.matches, ...ocrResult.matches];
+  const combinedTargets = [...pipeline.targets, ...imageTargets];
+
+  const detectionResult: DetectionResult = {
+    ...textDetectionResult,
+    matches: combinedMatches,
+    totalMatches: combinedMatches.length,
+    scannedTextLength: textDetectionResult.scannedTextLength,
+    executionTimeMs: textDetectionResult.executionTimeMs + ocrResult.executionTimeMs,
+  };
+
+  applyDetectionResult(detectionResult, combinedTargets);
+  const kmpMatches = textDetectionResult.matches.filter(
     (m) => m.algorithm === "KMP",
   ).length;
-  const bmMatches = detectionResult.matches.filter(
+  const bmMatches = textDetectionResult.matches.filter(
     (m) => m.algorithm === "BM",
   ).length;
-  const ahoCorasickMatches = detectionResult.matches.filter(
+  const ahoCorasickMatches = textDetectionResult.matches.filter(
     (m) => m.algorithm === "AhoCorasick",
   ).length;
-  const rabinKarpMatches = detectionResult.matches.filter(
+  const rabinKarpMatches = textDetectionResult.matches.filter(
     (m) => m.algorithm === "RabinKarp",
   ).length;
+  const ocrMatches = ocrResult.matches.length;
   const stats: PopupStats = {
     totalKeywords: detectionResult.totalMatches,
-    exactMatches: detectionResult.exactMatches,
-    regexMatches: detectionResult.regexMatches,
-    fuzzyMatches: detectionResult.fuzzyMatches,
+    exactMatches: textDetectionResult.exactMatches,
+    regexMatches: textDetectionResult.regexMatches,
+    fuzzyMatches: textDetectionResult.fuzzyMatches,
+    ocrMatches,
     kmpMatches,
     bmMatches,
     ahoCorasickMatches,
     rabinKarpMatches,
-    executionTimeMsKmp: detectionResult.timings.kmp,
-    executionTimeMsBm: detectionResult.timings.bm,
-    executionTimeMsAhoCorasick: detectionResult.timings.ahoCorasick,
-    executionTimeMsRabinKarp: detectionResult.timings.rabinKarp,
-    executionTimeMsRegex: detectionResult.timings.regex,
-    executionTimeMsFuzzy: detectionResult.timings.fuzzy,
+    executionTimeMsKmp: textDetectionResult.timings.kmp,
+    executionTimeMsBm: textDetectionResult.timings.bm,
+    executionTimeMsAhoCorasick: textDetectionResult.timings.ahoCorasick,
+    executionTimeMsRabinKarp: textDetectionResult.timings.rabinKarp,
+    executionTimeMsOcr: ocrResult.executionTimeMs,
+    executionTimeMsRegex: textDetectionResult.timings.regex,
+    executionTimeMsFuzzy: textDetectionResult.timings.fuzzy,
     lastScanMs: detectionResult.executionTimeMs,
   };
 
@@ -144,10 +179,21 @@ async function runScan(): Promise<ScanResponse> {
   };
 }
 
+function getOcrEnabled(): Promise<boolean> {
+  return new Promise((resolve) => {
+    chrome.storage.local.get({ ocrEnabled: false }, (items) => {
+      resolve(!!items.ocrEnabled);
+    });
+  });
+}
+
 chrome.runtime.onMessage.addListener(
   (message: unknown, _sender, sendResponse) => {
     if (message === "scan-now") {
-      void runScan().then((response) => sendResponse(response));
+      chrome.storage.local.get({ ocrEnabled: false }, (items) => {
+        const includeOcr = !!items.ocrEnabled;
+        void runScan(includeOcr).then((response) => sendResponse(response));
+      });
       return true;
     }
 
@@ -157,6 +203,17 @@ chrome.runtime.onMessage.addListener(
 
 let scanTimer: number | undefined;
 let internalMutation = false;
+// Track recent scrolls to suppress mutation-triggered scans during active scrolling
+let lastScrollMs = 0;
+const SCROLL_SUPPRESSION_MS = 400; // milliseconds to suppress after a scroll event
+
+window.addEventListener(
+  "scroll",
+  () => {
+    lastScrollMs = Date.now();
+  },
+  { passive: true },
+);
 
 function scheduleScan(): void {
   if (scanTimer !== undefined) {
@@ -165,7 +222,13 @@ function scheduleScan(): void {
 
   scanTimer = window.setTimeout(() => {
     internalMutation = true;
-    void runScan();
+    void getOcrEnabled().then((includeOcr) => {
+      console.debug('[JudolDetector][auto-scan] mutation-triggered scan', {
+        includeOcr,
+        url: location.href,
+      });
+      return runScan(includeOcr);
+    });
     window.setTimeout(() => {
       internalMutation = false;
     }, 0);
@@ -176,6 +239,10 @@ const observer = new MutationObserver((mutations) => {
   if (internalMutation) {
     return;
   }
+
+  // If a scroll just happened recently, skip handling mutations to avoid
+  // scheduling scans for layout-only/scroll-induced changes.
+  if (Date.now() - lastScrollMs < SCROLL_SUPPRESSION_MS) return;
 
   // If tooltip is visible (user interacting), avoid running scans to reduce noise.
   if (isTooltipVisible()) return;
@@ -220,4 +287,32 @@ chrome.storage.onChanged.addListener((changes, area) => {
   else removeBlur(document);
 });
 
-runScan();
+// Warmup OCR worker only if OCR toggle is enabled (saves resources / reduces extension size impact)
+chrome.storage.local.get({ ocrEnabled: false }, (items) => {
+  if (items.ocrEnabled) void warmupOcrWorker();
+});
+
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area !== 'local') return;
+  if ('ocrEnabled' in changes) {
+    const enabled = changes['ocrEnabled']?.newValue as boolean;
+    if (enabled) void warmupOcrWorker();
+  }
+});
+
+function startInitialScan(): void {
+  if (document.readyState === "complete") {
+    void runScan(true);
+    return;
+  }
+
+  window.addEventListener(
+    "load",
+    () => {
+      void runScan(true);
+    },
+    { once: true },
+  );
+}
+
+startInitialScan();

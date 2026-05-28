@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>OCR Test Runner</title>
+    <style>
+      body { font-family: Inter, Arial, sans-serif; margin: 20px; }
+      .controls { display:flex; gap:12px; align-items:center; margin-bottom:12px }
+      .grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(220px,1fr)); gap:12px }
+      img { width:100%; height:auto; display:block; border-radius:8px }
+      pre { background:#f6f6f6; padding:12px; border-radius:6px; overflow:auto }
+      .result { border:1px solid #ddd; padding:8px; border-radius:6px }
+    </style>
+  </head>
+  <body>
+    <h1>OCR Test Runner</h1>
+    <p>Runs the extension's OCR pipeline in-page using Tesseract.js (CDN). Use the controls to tune preprocessing.</p>
+
+    <div class="controls">
+      <label>Block size: <input id="blockSize" type="number" value="15" min="5" max="200" style="width:80px"/></label>
+      <label>Bias: <input id="bias" type="number" value="-10" min="-100" max="100" style="width:80px"/></label>
+      <label>Scales (CSV): <input id="scales" type="text" value="1,1.5,2" style="width:140px"/></label>
+      <button id="runBtn">Run OCR</button>
+      <button id="exportBtn">Export JSON</button>
+    </div>
+
+    <div id="summary"></div>
+
+    <section class="grid" id="images"></section>
+
+    <h2>Logs</h2>
+    <pre id="log"></pre>
+
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@v6/dist/tesseract.min.js"></script>
+    <script src="./runner.js"></script>
+  </body>
+</html>

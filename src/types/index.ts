@@ -1,4 +1,4 @@
-export type AlgorithmName = 'KMP' | 'BM' | 'Regex' | 'Fuzzy' | 'AhoCorasick' | 'RabinKarp';
+export type AlgorithmName = 'KMP' | 'BM' | 'Regex' | 'Fuzzy' | 'AhoCorasick' | 'RabinKarp' | 'OCR';
 
 export interface DetectionContext {
 	url: string;
@@ -53,6 +53,7 @@ export interface PopupStats {
 	exactMatches: number;
 	regexMatches: number;
 	fuzzyMatches: number;
+	ocrMatches: number;
 	kmpMatches: number;
 	bmMatches: number;
 	ahoCorasickMatches: number;
@@ -61,6 +62,7 @@ export interface PopupStats {
 	executionTimeMsBm: number;
 	executionTimeMsAhoCorasick: number;
 	executionTimeMsRabinKarp: number;
+	executionTimeMsOcr: number;
 	executionTimeMsRegex: number;
 	executionTimeMsFuzzy: number;
 	lastScanMs: number;
@@ -90,9 +92,12 @@ export interface ScanTarget {
 	text: string;
 	index: number;
 	tagName: string;
+	kind?: 'text' | 'image';
+	sourceUrl?: string;
 }
 
 export interface ContentPipelineState {
 	request: ScanRequest;
 	targets: ScanTarget[];
+	imageTargets?: ScanTarget[];
 }

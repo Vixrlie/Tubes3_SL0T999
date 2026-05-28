@@ -8,6 +8,7 @@ if (typeof chrome === "undefined" || !chrome.storage) {
     exactMatches: 8,
     regexMatches: 3,
     fuzzyMatches: 1,
+    ocrMatches: 2,
     kmpMatches: 8,
     bmMatches: 7,
     ahoCorasickMatches: 4,
@@ -16,6 +17,7 @@ if (typeof chrome === "undefined" || !chrome.storage) {
     executionTimeMsBm: 0.31,
     executionTimeMsAhoCorasick: 0.24,
     executionTimeMsRabinKarp: 0.19,
+    executionTimeMsOcr: 0.67,
     executionTimeMsRegex: 0.08,
     executionTimeMsFuzzy: 1.19,
     lastScanMs: 2.0,
@@ -49,6 +51,7 @@ const defaultStats: PopupStats = {
   exactMatches: 0,
   regexMatches: 0,
   fuzzyMatches: 0,
+  ocrMatches: 0,
   kmpMatches: 0,
   bmMatches: 0,
   ahoCorasickMatches: 0,
@@ -57,6 +60,7 @@ const defaultStats: PopupStats = {
   executionTimeMsBm: 0,
   executionTimeMsAhoCorasick: 0,
   executionTimeMsRabinKarp: 0,
+  executionTimeMsOcr: 0,
   executionTimeMsRegex: 0,
   executionTimeMsFuzzy: 0,
   lastScanMs: 0,
@@ -78,6 +82,16 @@ function setBarWidth(id: string, pct: number): void {
   if (el) el.style.width = `${Math.min(100, Math.max(0, pct))}%`;
 }
 
+function setOcrStatus(enabled: boolean): void {
+  const el = document.getElementById("ocr-status");
+  if (!el) return;
+
+  el.textContent = enabled
+    ? "Auto-scan OCR: active"
+    : "Auto-scan OCR: inactive";
+  el.classList.toggle("zero", !enabled);
+}
+
 function renderStats(stats: PopupStats): void {
   const total = stats.totalKeywords;
 
@@ -95,6 +109,7 @@ function renderStats(stats: PopupStats): void {
     stats.bmMatches,
     stats.ahoCorasickMatches,
     stats.rabinKarpMatches,
+    stats.ocrMatches,
     stats.regexMatches,
     stats.fuzzyMatches,
   ];
@@ -104,6 +119,7 @@ function renderStats(stats: PopupStats): void {
   setText("count-bm", String(stats.bmMatches));
   setText("count-aho", String(stats.ahoCorasickMatches));
   setText("count-rk", String(stats.rabinKarpMatches));
+  setText("count-ocr", String(stats.ocrMatches));
   setText("count-regex", String(stats.regexMatches));
   setText("count-fuzzy", String(stats.fuzzyMatches));
 
@@ -111,6 +127,7 @@ function renderStats(stats: PopupStats): void {
   setBarWidth("bar-bm", (stats.bmMatches / maxCount) * 100);
   setBarWidth("bar-aho", (stats.ahoCorasickMatches / maxCount) * 100);
   setBarWidth("bar-rk", (stats.rabinKarpMatches / maxCount) * 100);
+  setBarWidth("bar-ocr", (stats.ocrMatches / maxCount) * 100);
   setBarWidth("bar-regex", (stats.regexMatches / maxCount) * 100);
   setBarWidth("bar-fuzzy", (stats.fuzzyMatches / maxCount) * 100);
 
@@ -118,6 +135,7 @@ function renderStats(stats: PopupStats): void {
   setText("time-bm", formatMs(stats.executionTimeMsBm));
   setText("time-aho", formatMs(stats.executionTimeMsAhoCorasick));
   setText("time-rk", formatMs(stats.executionTimeMsRabinKarp));
+  setText("time-ocr", formatMs(stats.executionTimeMsOcr));
   setText("time-regex", formatMs(stats.executionTimeMsRegex));
   setText("time-fuzzy", formatMs(stats.executionTimeMsFuzzy));
 
@@ -191,12 +209,27 @@ document.addEventListener("DOMContentLoaded", () => {
     chrome.storage.local.set({ blurEnabled: blurToggle.checked });
   });
 
+  const ocrToggle = document.getElementById('toggle-ocr') as HTMLInputElement | null;
+  chrome.storage.local.get({ ocrEnabled: false }, (items) => {
+    const enabled = items['ocrEnabled'] as boolean;
+    if (ocrToggle) ocrToggle.checked = enabled;
+    setOcrStatus(enabled);
+  });
+  ocrToggle?.addEventListener('change', () => {
+    chrome.storage.local.set({ ocrEnabled: ocrToggle.checked });
+    setOcrStatus(ocrToggle.checked);
+  });
+
   chrome.storage.onChanged.addListener((changes, area) => {
     if (
       area === "local" &&
       Object.keys(changes).some((k) => k in defaultStats)
     ) {
       loadStats();
+    }
+
+    if (area === 'local' && 'ocrEnabled' in changes) {
+      setOcrStatus(!!changes['ocrEnabled']?.newValue);
     }
   });
 });

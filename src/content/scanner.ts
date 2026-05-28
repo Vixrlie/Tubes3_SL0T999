@@ -133,6 +133,54 @@ export function collectScanTargets(root: ParentNode = document): ScanTarget[] {
 	return targets;
 }
 
+function isElementVisible(element: HTMLElement): boolean {
+	const rect = element.getBoundingClientRect();
+	if (rect.width < 16 || rect.height < 16) {
+		return false;
+	}
+
+	return isVisibleElement(element);
+}
+
+function isValidImageSource(sourceUrl: string): boolean {
+	if (!sourceUrl) {
+		return false;
+	}
+
+	return !sourceUrl.startsWith('data:image/gif;base64,R0lGOD') && !sourceUrl.startsWith('data:image/svg+xml');
+}
+
+export function collectImageTargets(root: ParentNode = document, startIndex = 0): ScanTarget[] {
+	const targets: ScanTarget[] = [];
+	const seenSources = new Set<string>();
+	const images = root.querySelectorAll<HTMLImageElement>('img');
+	let index = startIndex;
+
+	images.forEach((image) => {
+		if (isInsideJudolUi(image) || !isElementVisible(image)) {
+			return;
+		}
+
+		const sourceUrl = image.currentSrc || image.src;
+		if (!isValidImageSource(sourceUrl) || seenSources.has(sourceUrl)) {
+			return;
+		}
+
+		seenSources.add(sourceUrl);
+		targets.push({
+			element: image,
+			text: normalizeText(image.alt || image.title || ''),
+			index,
+			tagName: 'img',
+			kind: 'image',
+			sourceUrl
+		});
+		index += 1;
+	});
+
+	return targets;
+}
+
 export function readDocumentText(root: ParentNode = document.body ?? document): string {
 	return normalizeText(root.textContent ?? '');
 }
