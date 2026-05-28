@@ -32,7 +32,10 @@
   ],
   "web_accessible_resources": [
     {
-      "resources": ["keywords/keywords.txt"],
+      "resources": [
+        "keywords/keywords.txt",
+        "assets/*"
+      ],
       "matches": ["<all_urls>"]
     }
   ]

@@ -97,15 +97,29 @@ async function runScan(includeOcr = false): Promise<ScanResponse> {
   clearHighlights(document);
   hideTooltip();
 
+  if (includeOcr) {
+    console.debug('[JudolDetector][auto-scan] OCR enabled, collecting image targets...');
+  }
+
   const pipeline = buildPipelineState();
   const textDetectionResult = await buildTextDetectionResult(
     pipeline.request,
     pipeline.targets,
   );
   const imageTargets = includeOcr ? pipeline.imageTargets ?? [] : [];
+  if (includeOcr) {
+    console.debug('[JudolDetector][auto-scan] image targets found:', imageTargets.length);
+  }
   const ocrResult = includeOcr && imageTargets.length > 0
     ? await runOcrDetection(imageTargets)
     : { matches: [], executionTimeMs: 0 };
+  if (includeOcr) {
+    console.debug('[JudolDetector][auto-scan] OCR result:', {
+      imageTargets: imageTargets.length,
+      ocrMatches: ocrResult.matches.length,
+      executionTimeMs: ocrResult.executionTimeMs,
+    });
+  }
   const combinedMatches = [...textDetectionResult.matches, ...ocrResult.matches];
   const combinedTargets = [...pipeline.targets, ...imageTargets];
 
@@ -208,7 +222,13 @@ function scheduleScan(): void {
 
   scanTimer = window.setTimeout(() => {
     internalMutation = true;
-    void getOcrEnabled().then((includeOcr) => runScan(includeOcr));
+    void getOcrEnabled().then((includeOcr) => {
+      console.debug('[JudolDetector][auto-scan] mutation-triggered scan', {
+        includeOcr,
+        url: location.href,
+      });
+      return runScan(includeOcr);
+    });
     window.setTimeout(() => {
       internalMutation = false;
     }, 0);

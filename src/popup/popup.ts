@@ -82,6 +82,16 @@ function setBarWidth(id: string, pct: number): void {
   if (el) el.style.width = `${Math.min(100, Math.max(0, pct))}%`;
 }
 
+function setOcrStatus(enabled: boolean): void {
+  const el = document.getElementById("ocr-status");
+  if (!el) return;
+
+  el.textContent = enabled
+    ? "Auto-scan OCR: active"
+    : "Auto-scan OCR: inactive";
+  el.classList.toggle("zero", !enabled);
+}
+
 function renderStats(stats: PopupStats): void {
   const total = stats.totalKeywords;
 
@@ -201,10 +211,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const ocrToggle = document.getElementById('toggle-ocr') as HTMLInputElement | null;
   chrome.storage.local.get({ ocrEnabled: false }, (items) => {
-    if (ocrToggle) ocrToggle.checked = items['ocrEnabled'] as boolean;
+    const enabled = items['ocrEnabled'] as boolean;
+    if (ocrToggle) ocrToggle.checked = enabled;
+    setOcrStatus(enabled);
   });
   ocrToggle?.addEventListener('change', () => {
     chrome.storage.local.set({ ocrEnabled: ocrToggle.checked });
+    setOcrStatus(ocrToggle.checked);
   });
 
   chrome.storage.onChanged.addListener((changes, area) => {
@@ -213,6 +226,10 @@ document.addEventListener("DOMContentLoaded", () => {
       Object.keys(changes).some((k) => k in defaultStats)
     ) {
       loadStats();
+    }
+
+    if (area === 'local' && 'ocrEnabled' in changes) {
+      setOcrStatus(!!changes['ocrEnabled']?.newValue);
     }
   });
 });
