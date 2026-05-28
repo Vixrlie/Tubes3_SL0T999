@@ -15,6 +15,10 @@ const OCR_SCALES = [1, 1.5, 2];
 const OCR_PER_CROP_TIMEOUT_MS = 2500;
 const OCR_CONFIDENCE_THRESHOLD = 45;
 const OCR_FUZZY_THRESHOLD = 0.35;
+const OCR_MIN_CROP_WIDTH = 32;
+const OCR_MIN_CROP_HEIGHT = 24;
+const OCR_PREPROCESS_MIN_SCALE = 4;
+const OCR_PREPROCESS_MAX_DIMENSION = 1600;
 
 function escapeRegExp(text: string): string {
 	return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -51,6 +55,58 @@ function isBetterFuzzyCandidate(token: string, keyword: string): boolean {
 	return score <= OCR_FUZZY_THRESHOLD;
 }
 
+function expandBoxToMinimumSize(
+	box: { x: number; y: number; w: number; h: number },
+	imageWidth: number,
+	imageHeight: number,
+): { x: number; y: number; w: number; h: number } {
+	const centerX = box.x + box.w / 2;
+	const centerY = box.y + box.h / 2;
+	const nextWidth = Math.max(box.w, OCR_MIN_CROP_WIDTH);
+	const nextHeight = Math.max(box.h, OCR_MIN_CROP_HEIGHT);
+
+	let x = Math.round(centerX - nextWidth / 2);
+	let y = Math.round(centerY - nextHeight / 2);
+
+	x = Math.max(0, Math.min(imageWidth - nextWidth, x));
+	y = Math.max(0, Math.min(imageHeight - nextHeight, y));
+
+	const width = Math.max(1, Math.min(imageWidth - x, nextWidth));
+	const height = Math.max(1, Math.min(imageHeight - y, nextHeight));
+
+	return { x, y, w: width, h: height };
+}
+
+function upscaleCanvasForOcr(canvas: HTMLCanvasElement): HTMLCanvasElement {
+	const width = canvas.width;
+	const height = canvas.height;
+	const minDimension = Math.min(width, height);
+	const scaleBySize = minDimension > 0 ? Math.max(1, OCR_PREPROCESS_MIN_SCALE / minDimension) : OCR_PREPROCESS_MIN_SCALE;
+	const scaleByWidth = width > 0 ? Math.max(1, OCR_PREPROCESS_MIN_SCALE / width) : OCR_PREPROCESS_MIN_SCALE;
+	const scaleByHeight = height > 0 ? Math.max(1, OCR_PREPROCESS_MIN_SCALE / height) : OCR_PREPROCESS_MIN_SCALE;
+	const scale = Math.min(
+		OCR_PREPROCESS_MAX_DIMENSION / Math.max(1, width),
+		OCR_PREPROCESS_MAX_DIMENSION / Math.max(1, height),
+		Math.max(scaleBySize, scaleByWidth, scaleByHeight, 1),
+	);
+
+	if (scale <= 1) {
+		return canvas;
+	}
+
+	const resized = document.createElement('canvas');
+	resized.width = Math.max(1, Math.round(width * scale));
+	resized.height = Math.max(1, Math.round(height * scale));
+	const ctx = resized.getContext('2d');
+	if (!ctx) {
+		return canvas;
+	}
+
+	ctx.imageSmoothingEnabled = true;
+	ctx.drawImage(canvas, 0, 0, resized.width, resized.height);
+	return resized;
+}
+
 async function createWorkerInstance(): Promise<OcrWorker> {
 	const tesseractModule = await import('tesseract.js');
 	const worker = await tesseractModule.createWorker('eng+ind');
@@ -78,8 +134,8 @@ function imageElementToDataUrl(image: HTMLImageElement): string {
 		return '';
 	}
 
-	const width = Math.max(1, Math.round(image.naturalWidth * Math.min(2, 1280 / Math.max(1, image.naturalWidth))));
-	const height = Math.max(1, Math.round(image.naturalHeight * Math.min(2, 1280 / Math.max(1, image.naturalWidth))));
+	const width = Math.max(1, Math.round(image.naturalWidth * Math.min(4, 1600 / Math.max(1, image.naturalWidth))));
+	const height = Math.max(1, Math.round(image.naturalHeight * Math.min(4, 1600 / Math.max(1, image.naturalWidth))));
 	const canvas = document.createElement('canvas');
 	canvas.width = width;
 	canvas.height = height;
@@ -112,9 +168,10 @@ function imageElementToDataUrl(image: HTMLImageElement): string {
 
 // New: preprocess a canvas (single crop) for OCR and return dataURL
 function preprocessCanvasForOcr(canvas: HTMLCanvasElement): string {
-	const width = canvas.width;
-	const height = canvas.height;
-	const ctx = canvas.getContext('2d', { willReadFrequently: true });
+	const inputCanvas = upscaleCanvasForOcr(canvas);
+	const width = inputCanvas.width;
+	const height = inputCanvas.height;
+	const ctx = inputCanvas.getContext('2d', { willReadFrequently: true });
 	if (!ctx) return canvas.toDataURL('image/png');
 
 	// convert to grayscale
@@ -177,7 +234,7 @@ function preprocessCanvasForOcr(canvas: HTMLCanvasElement): string {
 
 	const outImage = new ImageData(out, width, height);
 	ctx.putImageData(outImage, 0, 0);
-	return canvas.toDataURL('image/png');
+	return inputCanvas.toDataURL('image/png');
 }
 
 // Crop an image element to a rect and return a small canvas
@@ -253,7 +310,16 @@ function detectTextBBoxes(image: HTMLImageElement): { x: number; y: number; w: n
 			const y = Math.max(0, Math.floor(band.start * scaleY) - OCR_CROP_PADDING);
 			const boxW = Math.min(w - x, Math.ceil((right - left) * scaleX) + OCR_CROP_PADDING * 2);
 			const boxH = Math.min(h - y, Math.ceil((band.end - band.start) * scaleY) + OCR_CROP_PADDING * 2);
-			boxes.push({ x, y, w: boxW, h: boxH });
+			const expanded = expandBoxToMinimumSize({ x, y, w: boxW, h: boxH }, w, h);
+			if (expanded.w >= OCR_MIN_CROP_WIDTH || expanded.h >= OCR_MIN_CROP_HEIGHT) {
+				boxes.push(expanded);
+			} else {
+				console.debug('[JudolDetector][ocr] skip tiny box', {
+					original: { x, y, w: boxW, h: boxH },
+					expanded,
+					sourceSize: { w, h },
+				});
+			}
 		}
 	}
 
@@ -285,6 +351,7 @@ async function prepareImageForOcr(target: ScanTarget): Promise<string> {
 async function recognizeImage(target: ScanTarget): Promise<string> {
 	const sourceUrl = toImageSource(target);
 	if (!sourceUrl) {
+		console.debug('[JudolDetector][ocr] skip target: empty sourceUrl', { targetIndex: target.index });
 		return '';
 	}
 
@@ -297,9 +364,21 @@ async function recognizeImage(target: ScanTarget): Promise<string> {
 		const worker = await getWorker();
 		const imageInput = await prepareImageForOcr(target);
 		if (!imageInput) {
+			console.debug('[JudolDetector][ocr] skip target: unable to prepare image', {
+				sourceUrl,
+				targetIndex: target.index,
+			});
 			recognizedTextCache.set(sourceUrl, '');
 			return '';
 		}
+
+		console.debug('[JudolDetector][ocr] recognize start', {
+			sourceUrl,
+			targetIndex: target.index,
+			kind: target.kind,
+			isImageElement: target.element instanceof HTMLImageElement,
+			inputType: imageInput.startsWith('data:') ? 'data-url' : 'url',
+		});
 
 		// If imageInput is data URL, pass directly. But we also run multi-scale crops to improve recognition.
 		let aggregateText = '';
@@ -323,6 +402,12 @@ async function recognizeImage(target: ScanTarget): Promise<string> {
 		if (target.element instanceof HTMLImageElement) {
 			const imgEl = target.element as HTMLImageElement;
 			const boxes = detectTextBBoxes(imgEl).slice(0, MAX_OCR_TARGETS);
+			console.debug('[JudolDetector][ocr] detected boxes', {
+				sourceUrl,
+				targetIndex: target.index,
+				boxCount: boxes.length,
+				boxes,
+			});
 			// process each box at multiple scales
 			for (const box of boxes) {
 				let recognized = '';
@@ -339,16 +424,45 @@ async function recognizeImage(target: ScanTarget): Promise<string> {
 						]);
 						const textPart = normalizeWhitespace(result.data?.text ?? '');
 						const confidence = extractConfidence(result);
+						console.debug('[JudolDetector][ocr] crop result', {
+							sourceUrl,
+							targetIndex: target.index,
+							box,
+							scale,
+							confidence,
+							textPreview: textPart.slice(0, 120),
+						});
 						if (textPart.length > 0 && confidence >= OCR_CONFIDENCE_THRESHOLD) {
 							recognized = textPart.trim();
 							recognizedConfidence = confidence;
 							break; // use the first non-empty scale result
 						}
+						if (textPart.length > 0 && confidence < OCR_CONFIDENCE_THRESHOLD) {
+							console.debug('[JudolDetector][ocr] crop rejected by confidence threshold', {
+								sourceUrl,
+								targetIndex: target.index,
+								confidence,
+								threshold: OCR_CONFIDENCE_THRESHOLD,
+								textPreview: textPart.slice(0, 120),
+							});
+						}
 					} catch {
+						console.debug('[JudolDetector][ocr] crop recognition error', {
+							sourceUrl,
+							targetIndex: target.index,
+							box,
+							scale,
+						});
 						// ignore and continue
 					}
 				}
 				if (recognized) {
+					console.debug('[JudolDetector][ocr] crop accepted', {
+						sourceUrl,
+						targetIndex: target.index,
+						confidence: recognizedConfidence,
+						textPreview: recognized.slice(0, 120),
+					});
 					appendRecognitionText(recognized, recognizedConfidence);
 				}
 			}
@@ -359,6 +473,12 @@ async function recognizeImage(target: ScanTarget): Promise<string> {
 			const result = await worker.recognize(imageInput);
 			const confidence = extractConfidence(result);
 			const text = normalizeWhitespace(result.data?.text ?? '');
+			console.debug('[JudolDetector][ocr] whole-image fallback result', {
+				sourceUrl,
+				targetIndex: target.index,
+				confidence,
+				textPreview: text.slice(0, 120),
+			});
 			if (text.length > 0 && confidence >= OCR_CONFIDENCE_THRESHOLD) {
 				aggregateText = text;
 				aggregateConfidence = confidence;
@@ -367,9 +487,16 @@ async function recognizeImage(target: ScanTarget): Promise<string> {
 		}
 
 		const text = aggregateText;
+		console.debug('[JudolDetector][ocr] recognize done', {
+			sourceUrl,
+			targetIndex: target.index,
+			finalTextLength: text.length,
+			avgConfidence: confidenceSamples > 0 ? aggregateConfidence / confidenceSamples : 0,
+		});
 		recognizedTextCache.set(sourceUrl, text);
 		return text;
 	} catch {
+		console.debug('[JudolDetector][ocr] recognize failed', { sourceUrl, targetIndex: target.index });
 		recognizedTextCache.set(sourceUrl, '');
 		return '';
 	}
@@ -470,17 +597,39 @@ export async function runOcrDetection(targets: ScanTarget[]): Promise<{ matches:
 	const matches: KeywordMatch[] = [];
 
 	const imageTargets = targets.filter((target) => target.kind === 'image').slice(0, MAX_OCR_TARGETS);
+	console.debug('[JudolDetector][ocr] run start', {
+		imageTargets: imageTargets.length,
+		keywords: keywords.length,
+		maxTargets: MAX_OCR_TARGETS,
+	});
 
 	for (const target of imageTargets) {
 		const recognizedText = await recognizeImage(target);
 		if (!recognizedText) {
+			console.debug('[JudolDetector][ocr] no recognized text after OCR', {
+				targetIndex: target.index,
+				sourceUrl: toImageSource(target),
+			});
 			continue;
 		}
 
 		const searchText = normalizeKeyword(recognizedText);
 		const tokens = tokenizeOcrText(searchText);
+		console.debug('[JudolDetector][ocr] post-process', {
+			targetIndex: target.index,
+			sourceUrl: toImageSource(target),
+			searchTextPreview: searchText.slice(0, 160),
+			tokenCount: tokens.length,
+			tokens: tokens.slice(0, 20),
+		});
 		const exactMatch = findExactKeywordMatch(searchText, keywords);
 		if (exactMatch) {
+			console.debug('[JudolDetector][ocr] exact OCR match', {
+				targetIndex: target.index,
+				keyword: exactMatch.keyword,
+				matchedText: exactMatch.matchedText,
+				occurrenceCount: exactMatch.occurrenceCount,
+			});
 			matches.push({
 				...exactMatch,
 				targetIndex: target.index
@@ -494,9 +643,20 @@ export async function runOcrDetection(targets: ScanTarget[]): Promise<{ matches:
 
 		const fuzzyMatch = findFuzzyKeywordMatch(tokens, keywords);
 		if (fuzzyMatch) {
+			console.debug('[JudolDetector][ocr] fuzzy OCR match', {
+				targetIndex: target.index,
+				keyword: fuzzyMatch.keyword,
+				matchedText: fuzzyMatch.matchedText,
+				score: fuzzyMatch.score,
+			});
 			matches.push({
 				...fuzzyMatch,
 				targetIndex: target.index
+			});
+		} else {
+			console.debug('[JudolDetector][ocr] no keyword matched after OCR post-process', {
+				targetIndex: target.index,
+				sourceUrl: toImageSource(target),
 			});
 		}
 	}
