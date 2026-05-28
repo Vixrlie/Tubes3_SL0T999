@@ -398,6 +398,104 @@ slot spadegaming
 slot playtech
 slot red tiger
 slot netent
+promo
+promosi
+event
+event spesial
+hadiah
+hadiah harian
+hadiah mingguan
+reward
+loyalty
+member vip
+vip
+platinum
+premium
+customer service
+cs
+cs online
+live chat
+support
+help center
+bantuan
+pusat bantuan
+kontak
+admin
+login
+logout
+register
+registration
+daftar akun
+sign up
+sign in
+verify
+verifikasi
+validasi
+maintenance
+update
+download apk
+aplikasi
+mobile
+web app
+official
+trusted
+recommended
+top up
+withdrawal
+penarikan
+deposit
+transaksi
+pembayaran
+bank
+ewallet
+pulsa
+qris
+virtual account
+transfer
+voucher
+claim
+klaim
+bonus claim
+spin now
+play now
+join now
+register now
+daily mission
+mission
+misi
+leaderboard
+tournament
+turnamen
+lucky wheel
+wheel of fortune
+jackpot prize
+prize
+cash reward
+member area
+profile member
+welcome bonus
+welcome package
+new user bonus
+bonus referral
+referral code
+invite friend
+whatsapp
+telegram
+telegram support
+24 jam
+service 24 jam
+fast payout
+payout
+instant withdraw
+easy deposit
+secure payment
+safe and trusted
+login now
+daftar sekarang
+claim bonus
+bonus harian
+bonus mingguan
+bonus bulanan
 slot one touch
 slot booongo
 slot nolimit city
