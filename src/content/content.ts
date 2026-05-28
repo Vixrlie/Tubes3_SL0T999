@@ -15,7 +15,7 @@ import {
   removeBlur,
 } from "./highlighter";
 import { collectImageTargets, collectScanTargets, readDocumentText } from "./scanner";
-import { runOcrDetection, warmupOcrWorker } from "./ocr";
+import { runOcrDetection, warmupOcrWorker } from "./ocr.ts";
 import { hideTooltip, isTooltipVisible } from "./tooltip";
 
 function createRequest(): ScanRequest {
