@@ -165,6 +165,14 @@ async function runScan(includeOcr = false): Promise<ScanResponse> {
   };
 }
 
+function getOcrEnabled(): Promise<boolean> {
+  return new Promise((resolve) => {
+    chrome.storage.local.get({ ocrEnabled: false }, (items) => {
+      resolve(!!items.ocrEnabled);
+    });
+  });
+}
+
 chrome.runtime.onMessage.addListener(
   (message: unknown, _sender, sendResponse) => {
     if (message === "scan-now") {
@@ -200,7 +208,7 @@ function scheduleScan(): void {
 
   scanTimer = window.setTimeout(() => {
     internalMutation = true;
-    void runScan(false);
+    void getOcrEnabled().then((includeOcr) => runScan(includeOcr));
     window.setTimeout(() => {
       internalMutation = false;
     }, 0);
