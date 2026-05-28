@@ -199,6 +199,14 @@ document.addEventListener("DOMContentLoaded", () => {
     chrome.storage.local.set({ blurEnabled: blurToggle.checked });
   });
 
+  const ocrToggle = document.getElementById('toggle-ocr') as HTMLInputElement | null;
+  chrome.storage.local.get({ ocrEnabled: false }, (items) => {
+    if (ocrToggle) ocrToggle.checked = items['ocrEnabled'] as boolean;
+  });
+  ocrToggle?.addEventListener('change', () => {
+    chrome.storage.local.set({ ocrEnabled: ocrToggle.checked });
+  });
+
   chrome.storage.onChanged.addListener((changes, area) => {
     if (
       area === "local" &&

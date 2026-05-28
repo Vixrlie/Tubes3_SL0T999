@@ -168,7 +168,10 @@ async function runScan(includeOcr = false): Promise<ScanResponse> {
 chrome.runtime.onMessage.addListener(
   (message: unknown, _sender, sendResponse) => {
     if (message === "scan-now") {
-      void runScan(true).then((response) => sendResponse(response));
+      chrome.storage.local.get({ ocrEnabled: false }, (items) => {
+        const includeOcr = !!items.ocrEnabled;
+        void runScan(includeOcr).then((response) => sendResponse(response));
+      });
       return true;
     }
 
@@ -256,7 +259,18 @@ chrome.storage.onChanged.addListener((changes, area) => {
   else removeBlur(document);
 });
 
-void warmupOcrWorker();
+// Warmup OCR worker only if OCR toggle is enabled (saves resources / reduces extension size impact)
+chrome.storage.local.get({ ocrEnabled: false }, (items) => {
+  if (items.ocrEnabled) void warmupOcrWorker();
+});
+
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area !== 'local') return;
+  if ('ocrEnabled' in changes) {
+    const enabled = changes['ocrEnabled']?.newValue as boolean;
+    if (enabled) void warmupOcrWorker();
+  }
+});
 
 function startInitialScan(): void {
   if (document.readyState === "complete") {
