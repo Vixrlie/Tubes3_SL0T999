@@ -89,7 +89,6 @@ Aturan bad character memanfaatkan posisi kemunculan terakhir suatu karakter di d
 
 Aturan good suffix bekerja ketika sebagian sufiks pola sudah cocok, lalu mismatch terjadi sebelum bagian yang cocok tersebut selesai diperiksa. Misalkan sufiks sepanjang $\ell$ sudah cocok; maka good suffix rule mencari pergeseran terkecil agar sufiks yang sudah cocok itu sejajar dengan kemunculan lain yang sama di dalam pola, atau dengan prefiks pola yang juga cocok sebagai sufiks. Dengan kata lain, aturan ini memanfaatkan struktur internal pola yang sudah berhasil dicocokkan agar pergeseran tetap aman tetapi tidak terlalu kecil. Pada implementasi nyata, nilai pergeseran good suffix biasanya disimpan di tabel preprocessing karena perhitungannya lebih efisien jika dibangun sekali di awal.
 
-Contoh berikut menggunakan teks \texttt{ANPANMAN} dengan pola \texttt{NMAN}. Alignment awal tidak langsung menghasilkan match, sehingga beberapa pergeseran terjadi sebelum pola akhirnya sejajar sempurna dengan bagian teks yang relevan. Contoh ini lebih jelas menunjukkan bagaimana Boyer-Moore memanfaatkan pemeriksaan dari kanan ke kiri serta shift rules untuk melewati alignment yang tidak cocok tanpa harus mengulang pencocokan dari awal.
 
 \begin{tcolorbox}[breakable,title={Pseudocode Algoritma Boyer-Moore}]
     \begin{algorithmic}[1]
@@ -135,6 +134,8 @@ Contoh berikut menggunakan teks \texttt{ANPANMAN} dengan pola \texttt{NMAN}. Ali
     \end{algorithmic}
 \end{tcolorbox}
 
+Contoh berikut menggunakan teks \texttt{ANPANMAN} dengan pola \texttt{NMAN}. Alignment awal tidak langsung menghasilkan match, sehingga beberapa pergeseran terjadi sebelum pola akhirnya sejajar sempurna dengan bagian teks yang relevan. Contoh ini lebih jelas menunjukkan bagaimana Boyer-Moore memanfaatkan pemeriksaan dari kanan ke kiri serta shift rules untuk melewati alignment yang tidak cocok tanpa harus mengulang pencocokan dari awal.
+
 \begin{table}[H]
     \centering
     \caption{Contoh langkah pencocokan Boyer-Moore pada teks \texttt{ANPANMAN} dengan pola \texttt{NMAN}.}
@@ -168,6 +169,7 @@ Secara formal, misalkan himpunan pola dinyatakan sebagai $D = \{p_1, p_2, \dots,
 Komponen utama Aho-Corasick dapat dibaca langsung dari visualisasi automaton-nya. Trie menyimpan struktur prefix dari seluruh dictionary, failure link menghubungkan state ke sufiks yang masih berguna, dan output link atau daftar output menandai state yang mewakili akhir satu atau lebih pola. Ketiga komponen ini bekerja bersama: trie menangani pencocokan prefix, failure link menangani mismatch, dan output menyelesaikan deteksi pola yang berakhir pada state tertentu. Karena itu, Aho-Corasick tidak hanya sekadar trie biasa, melainkan trie yang diperkaya dengan mekanisme fallback dan pelaporan hasil.
 
 \begin{figure}[H]
+    \centering
     \begin{forest}
         for tree={
         draw,
@@ -226,7 +228,7 @@ Komponen utama Aho-Corasick dapat dibaca langsung dari visualisasi automaton-nya
     \label{fig:aho-automaton}
 \end{figure}
 
-Lalu, apa mekanisme pembangunan automatonnya dan bagaimana cara teksnya dipindai? Pada tahap preprocessing, trie akan dibentuk terlebih dahulu, lalu failure link dihitung dengan menelusuri level demi level menggunakan antrian. Setelah automaton siap, teks diproses satu karakter demi satu karakter; jika transisi tidak tersedia, algoritma mengikuti failure link sampai menemukan state yang cocok atau kembali ke akar. Lebih lanjut, algoritma Aho-Corasick dapat dideskripsikan melalui Pseudocode di bawah ini.
+Lalu, bagaimana mekanisme pembangunan automatonnya dan bagaimana cara teksnya dipindai? Pada tahap preprocessing, trie akan dibentuk terlebih dahulu, lalu failure link dihitung dengan menelusuri level demi level menggunakan antrian. Setelah automaton siap, teks diproses satu karakter demi satu karakter; jika transisi tidak tersedia, algoritma mengikuti failure link sampai menemukan state yang cocok atau kembali ke akar. Lebih lanjut, algoritma Aho-Corasick dapat dideskripsikan melalui Pseudocode di bawah ini.
 
 \begin{tcolorbox}[breakable,title={Algoritma Aho-Corasick}]
     \begin{algorithmic}[1]
