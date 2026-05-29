@@ -1,4 +1,4 @@
-\section{Pattern Matching}
+﻿\section{Pattern Matching}
 
 Pattern matching adalah proses menemukan kemunculan satu pola atau lebih di dalam data yang lebih panjang, umumnya berupa string, dokumen, atau aliran teks. Pada dasarnya, masalah ini muncul ketika sistem harus menentukan apakah suatu fragmen teks cocok dengan pola tertentu, lalu pada tahap lanjutan mengukur posisi, jumlah kemunculan, atau tingkat kemiripan pola tersebut. Dalam literatur, pattern matching menjadi fondasi bagi banyak teknik pencarian string klasik seperti Knuth-Morris-Pratt, Boyer-Moore, Aho-Corasick, dan Rabin-Karp \cite{knuth1977fast,boyer1977fast,aho1975efficient,karp1987efficient}.
 
@@ -409,17 +409,63 @@ Contoh regex sederhana adalah \texttt{a\*b}, yang menerima string \texttt{b}, \t
 
 Fuzzy matching adalah pendekatan pencocokan yang tidak menuntut identitas string secara penuh, melainkan menerima derajat kemiripan tertentu. Teknik ini cocok digunakan ketika data mengandung noise, variasi ejaan, atau manipulasi karakter visual-similar. Dalam literatur pencocokan string, ide ini sangat erat dengan pengukuran jarak edit, terutama Levenshtein distance \cite{levenshtein1966binary}.
 
+Untuk memperjelas konsep ini, pada Gambar~\ref{fig:fuzzy-matching-example} ditunjukkan contoh visualisasi proses fuzzy matching. Gambar memperlihatkan dua string yang dibandingkan beserta operasi edit (insertion, deletion, substitution) yang diperlukan untuk mengubah satu string menjadi lainnya. Pada implementasi praktis, tiap operasi dapat diberi bobot berbeda (mis. substitution visual-similar diberi penalti lebih kecil), lalu jarak edit total dibandingkan dengan ambang (threshold) untuk menentukan apakah dua string dianggap "cocok".
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.75\linewidth]{fuzzy-matching.png}
+    \caption{Contoh visualisasi fuzzy matching: operasi insertion, deletion, dan substitution serta penentuan jarak edit.}
+    \label{fig:fuzzy-matching-example}
+\end{figure}
+
 \subsection{Weighted Levenshtein Distance}
+Weighted Levenshtein distance memperluas jarak edit standar dengan memberikan bobot berbeda pada operasi insertion, deletion, dan substitution. Pendekatan ini memungkinkan penalti substitution yang lebih kecil untuk pasangan karakter yang mirip secara visual (Contohnya, \texttt{o} vs  \texttt{0} dan \texttt{l} vs \texttt{1}), sehingga sistem menjadi lebih toleran terhadap variasi yang sering muncul pada data nyata \cite{levenshtein1966binary}.
 
-Weighted Levenshtein distance memperluas jarak edit standar dengan memberikan bobot yang berbeda untuk operasi insertion, deletion, dan substitution. Dengan pendekatan berbobot, substitusi antara karakter yang mirip secara visual dapat diberi penalti lebih kecil dibanding substitusi karakter yang tidak mirip, sehingga sistem menjadi lebih toleran terhadap variasi seperti huruf yang ditukar dengan angka atau simbol yang bentuknya menyerupai huruf asli \cite{levenshtein1966binary}.
+Lebih formal, misalkan $s = s_1 s_2 \dots s_m$ dan $t = t_1 t_2 \dots t_n$ adalah dua string. Definisikan fungsi biaya
+\(w_{ins}(c)\) untuk menyisipkan karakter $c$, \(w_{del}(c)\) untuk menghapus karakter $c$, dan \(w_{sub}(a,b)\) untuk mengganti karakter $a$ menjadi $b$. Selain itu, definisikan pula matriks biaya $D(i,j)$ sebagai biaya minimum untuk mengubah prefix $s_{1..i}$ menjadi $t_{1..j}$. Inisialisasi dan rekurensi dasar adalah
+$$
+    D(0,0)=0,\qquad D(i,0)=D(i-1,0)+w_{del}(s_i),\qquad D(0,j)=D(0,j-1)+w_{ins}(t_j).
+$$
+Untuk $i\ge1, j\ge1$ akan berlaku
+$$
+    D(i,j)=\min\begin{cases}
+        D(i-1,j)+w_{del}(s_i), \\
+        D(i,j-1)+w_{ins}(t_j), \\
+        D(i-1,j-1)+\begin{cases}0 &\text{jika } s_i=t_j,\\ w_{sub}(s_i,t_j) &\text{lainnya.}\end{cases}
+    \end{cases}
+$$
 
-Dalam laporan ini, weighted Levenshtein menjadi dasar untuk mendeteksi manipulasi karakter yang tidak tertangkap oleh exact matching maupun RegEx. Dengan menetapkan threshold yang sesuai, sistem dapat membedakan antara variasi yang masih relevan dan teks yang terlalu jauh dari keyword target.
+Secara intuitif, rumus tersebut sedang memilih operasi edit termurah pada setiap pasangan prefix. Cabang pertama berarti karakter terakhir dari string sumber dihapus, cabang kedua berarti karakter terakhir dari string target disisipkan, dan cabang ketiga berarti kedua karakter terakhir dibandingkan langsung, lalu diberi biaya nol jika sama atau biaya substitution jika berbeda. Dengan kata lain, algoritma ini membangun solusi dari potongan kecil ke potongan yang lebih besar sambil selalu menyimpan pilihan termurah yang pernah ditemukan.
+
+Secara alternatif, dengan notasi \(\mathrm{head}(x)\) dan \(\mathrm{tail}(x)\), untuk string non-kosong, definisi dapat ditulis sebagai
+$$
+    \mathrm{lev}(a,b)=\begin{cases}
+        \sum_{c\in a} w_{del}(c)                                                                                 & \text{jika } |b|=0,                             \\
+        \sum_{c\in b} w_{ins}(c)                                                                                 & \text{jika } |a|=0,                             \\
+        \mathrm{lev}(\mathrm{tail}(a),\mathrm{tail}(b))                                                          & \text{jika } \mathrm{head}(a)=\mathrm{head}(b), \\
+        \min\left\{\begin{array}{l}
+                       w_{ins}(\mathrm{head}(b))+\mathrm{lev}(a,\mathrm{tail}(b)), \\
+                       w_{del}(\mathrm{head}(a))+\mathrm{lev}(\mathrm{tail}(a),b), \\
+                       w_{sub}(\mathrm{head}(a),\mathrm{head}(b))+\mathrm{lev}(\mathrm{tail}(a),\mathrm{tail}(b))
+                   \end{array}\right. & \text{lainnya.}
+    \end{cases}
+$$
+
+Contoh, ambil $a=\texttt{o}$ dan $b=\texttt{0}$ serta biaya $w_{ins}=1$, $w_{del}=1$, $w_{sub}('o','0')=0.3$. Pada kasus ini, intuitifnya kita hanya perlu satu langkah substitusi kecil karena kedua karakter hampir sama secara visual, sehingga sistem lebih memilih jalur diagonal daripada menghapus lalu menyisipkan ulang karakter. Maka,
+\begin{align*}
+    \mathrm{lev}('', '')  & = 0,                               \\
+    \mathrm{lev}('', '0') & = 1,                               \\
+    \mathrm{lev}('o', '') & = 1,                               \\
+    \mathrm{lev}('o','0') & = \min\{1+1,\;1+1,\;0+0.3\} = 0.3.
+\end{align*}
+
+Hasil tersebut menunjukkan bahwa substitusi antara karakter visual-similar mendapat penalti lebih kecil sehingga jarak akhir turun, yang berguna untuk mendeteksi manipulasi karakter ringan tanpa menaikkan false positive secara signifikan.
 
 \section{Optical Character Recognition (OCR)}
 
 Optical Character Recognition adalah proses mengekstrak teks dari citra atau gambar sehingga isi visual dapat diperlakukan sebagai teks yang dapat dicari. OCR penting ketika konten yang ingin diperiksa tidak muncul langsung sebagai DOM text, melainkan tertanam di dalam gambar. Ray Smith menjelaskan bahwa Tesseract dibangun sebagai mesin OCR yang mampu melakukan pengenalan karakter melalui pipeline analisis citra dan interpretasi teks \cite{smith2007tesseract}.
 
-Dalam konteks sistem ini, OCR berfungsi sebagai lapisan tambahan setelah pemindaian teks biasa. Setelah teks diekstrak dari gambar, hasilnya masih perlu diproses dengan mekanisme pencocokan yang sama agar deteksi tetap konsisten dengan keyword yang digunakan pada halaman.
+Dalam konteks program, OCR berfungsi sebagai lapisan tambahan setelah pemindaian teks biasa. Setelah teks diekstrak dari gambar, hasilnya masih perlu diproses dengan mekanisme pencocokan yang sama agar deteksi tetap konsisten dengan keyword yang digunakan pada halaman.
 
 \section{Chromium Browser Extension}
 
@@ -429,8 +475,48 @@ Pada arsitektur semacam ini, content script biasanya bertugas membaca dan memani
 
 \subsection{Arsitektur Singkat}
 
-Arsitektur singkat extension ini terdiri dari content script yang memindai DOM, background yang menangani komunikasi antarkomponen, dan popup yang menampilkan statistik serta kontrol fitur. Pemisahan ini penting karena proses deteksi dapat berjalan di halaman aktif, tetapi status hasil dan pengaturan pengguna harus tetap konsisten ketika popup dibuka dan ditutup. Dengan desain seperti ini, extension dapat mempertahankan state tanpa mengganggu interaksi pengguna di halaman.
+Arsitektur singkat extension ini terdiri dari tiga lapisan utama. Pertama, 	extit{content script} berjalan pada setiap halaman aktif dan menjadi mesin utama deteksi: ia membaca teks DOM, mengumpulkan target pencarian, menjalankan rangkaian algoritma pattern matching, memberi highlight/blur pada elemen yang cocok, serta menjalankan OCR untuk elemen gambar bila opsi OCR diaktifkan. Kedua, 	extit{popup} berperan sebagai panel kendali yang menampilkan statistik hasil scan, tombol pemindaian manual, dan toggle fitur seperti blur serta OCR. Ketiga, 	extit{background service worker} menangani state yang bersifat global, terutama badge pada ikon extension dan sinkronisasi nilai di 	exttt{chrome.storage}. Dengan pembagian ini, proses deteksi tetap dapat berjalan di halaman aktif, sementara antarmuka pengguna tetap ringan dan status hasil tetap konsisten lintas tab serta sesi.
+
+Secara alur, popup mengirimkan permintaan scan ke content script melalui 	exttt{chrome.tabs.sendMessage}. Content script kemudian membentuk konteks scan dari URL dan teks halaman, menjalankan mesin deteksi, menyimpan ringkasan statistik ke storage lokal, lalu mengirimkan hasil visual kembali ke halaman melalui highlight dan blur. Background mendengarkan perubahan pada 	exttt{chrome.storage.local} untuk memperbarui badge angka pada ikon extension, sehingga pengguna dapat melihat adanya temuan bahkan sebelum membuka popup.
+
+\begin{figure}[H]
+    \centering
+    \begin{tikzpicture}[
+            >=stealth,
+            node distance=2.2cm and 2.8cm,
+            box/.style={draw, rounded corners, align=center, font=\small, minimum width=3.2cm, minimum height=1.05cm},
+            arrow/.style={->, thick}
+        ]
+        \node[box] (popup) {Popup UI\\\textit{Scan now}, toggle blur, toggle OCR\\render statistik};
+        \node[box, right=of popup] (content) {Content Script\\scan DOM, pattern matching, OCR\\highlight / blur elemen};
+        \node[box, below=of content] (storage) {\texttt{chrome.storage.local}\\statistik, status fitur};
+        \node[box, left=of storage] (background) {Background Service Worker\\badge ikon, sync state};
+        \node[box, above=of content] (page) {Halaman Aktif\\teks DOM, gambar, elemen target};
+
+        \draw[arrow] (popup) -- node[above, draw=none] {\texttt{scan-now}} (content);
+        \draw[arrow] (content) -- node[right, draw=none] {baca} (page);
+        \draw[arrow] (content) -- node[right, draw=none] {simpan hasil} (storage);
+        \draw[arrow] (storage) -- node[below, draw=none] {\texttt{onChanged}} (background);
+        \draw[arrow] (background) -- node[left, draw=none] {badge} (popup);
+        \draw[arrow] (popup) -- node[left, draw=none] {toggle fitur} (storage);
+    \end{tikzpicture}
+    \caption{Arsitektur singkat \texttt{Judol Detector}: popup menjadi pusat kontrol, content script menjalankan deteksi pada halaman aktif, dan background menjaga badge serta sinkronisasi state.}
+    \label{fig:judol-extension-architecture}
+\end{figure}
 
 \subsection{Akuisisi dan Pemindaian DOM}
 
-Akuisisi DOM dilakukan dengan membaca node teks dan elemen media yang relevan dari halaman aktif, lalu menyaring bagian yang benar-benar layak dipindai. Pada praktiknya, proses ini harus memperhatikan visibility elemen, jenis tag, dan potensi interferensi dari elemen UI milik extension sendiri agar hasil scan tidak tercampur dengan komponen internal. Setelah target terkumpul, sistem dapat menjalankan pattern matching, menandai elemen yang cocok, dan memperbarui statistik tampilan secara sinkron.
+Akuisisi DOM pada program ini memakai pendekatan \textit{hybrid scan}. Bagian teks dikumpulkan dengan menelusuri \texttt{Text node} melalui \texttt{TreeWalker}, lalu setiap node dipetakan ke elemen kontainer yang paling representatif. Selama proses ini, elemen skrip dan gaya seperti \texttt{script}, \texttt{style}, \texttt{noscript}, \texttt{meta}, dan \texttt{link} diabaikan, begitu pula elemen yang tidak terlihat atau yang berada di dalam UI internal extension. Bagian gambar dipindai terpisah dengan menelusuri semua elemen \texttt{img}, memeriksa apakah elemen tersebut terlihat, menghindari sumber gambar yang tidak relevan, lalu memakai \texttt{alt} atau \texttt{title} sebagai konteks teks tambahan. Pendekatan dua jalur ini membuat sistem dapat menangani teks biasa dan konten visual secara lebih stabil tanpa mencampur keduanya.
+
+Setelah target teks dan gambar terkumpul, sistem membangun konteks scan yang berisi URL halaman, teks normalisasi, dan daftar target yang sudah difilter. Konteks ini kemudian dikirim ke mesin deteksi pattern matching. Jika sebuah elemen cocok, sistem tidak hanya menandai elemen tersebut, tetapi juga menyimpan indeks target agar hasil highlight, tooltip, dan perhitungan statistik dapat dilacak kembali secara konsisten.
+
+Secara ringkas, alur pemindaian DOM pada program ini dapat dituliskan sebagai berikut.
+
+\begin{enumerate}
+    \item Telusuri seluruh node teks pada halaman yang terlihat dan bukan bagian dari UI internal extension.
+    \item Peta setiap node teks ke kontainer yang paling representatif, lalu simpan hanya kontainer yang belum pernah diproses.
+    \item Telusuri seluruh elemen gambar yang terlihat dan memiliki sumber valid.
+    \item Abaikan elemen duplikat serta sumber gambar yang sudah pernah diproses.
+    \item Bentuk konteks scan dari URL halaman, teks hasil normalisasi, dan daftar target teks serta gambar.
+    \item Kirim konteks tersebut ke modul deteksi untuk menghasilkan highlight, tooltip, dan statistik.
+\end{enumerate}
