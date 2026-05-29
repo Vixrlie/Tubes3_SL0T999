@@ -168,7 +168,6 @@ Secara formal, misalkan himpunan pola dinyatakan sebagai $D = \{p_1, p_2, \dots,
 Komponen utama Aho-Corasick dapat dibaca langsung dari visualisasi automaton-nya. Trie menyimpan struktur prefix dari seluruh dictionary, failure link menghubungkan state ke sufiks yang masih berguna, dan output link atau daftar output menandai state yang mewakili akhir satu atau lebih pola. Ketiga komponen ini bekerja bersama: trie menangani pencocokan prefix, failure link menangani mismatch, dan output menyelesaikan deteksi pola yang berakhir pada state tertentu. Karena itu, Aho-Corasick tidak hanya sekadar trie biasa, melainkan trie yang diperkaya dengan mekanisme fallback dan pelaporan hasil.
 
 \begin{figure}[H]
-    \centering
     \begin{forest}
         for tree={
         draw,
@@ -386,9 +385,25 @@ Secara kompleksitas, preprocessing hash pola memerlukan waktu $O(m)$ dan pembaru
 
 \section{Regular Expression (\texttt{RegEx}) Matching}
 
-Regular expression adalah notasi formal untuk mendeskripsikan pola string yang lebih umum daripada daftar kata kunci statis. Dalam praktik pemrograman, ekspresi reguler dipakai untuk mengenali bentuk teks tertentu seperti pola kata, angka, batas kata, atau gabungan beberapa kondisi sekaligus. Karena fleksibilitasnya, RegEx sering dipakai ketika sistem harus menangkap variasi penulisan yang masih mengikuti struktur umum tertentu \cite{mdnregexp}.
+Regular expression adalah notasi formal untuk mendeskripsikan bahasa reguler, yaitu himpunan string yang dapat dibangun dari alfabet tertentu melalui operasi bahasa formal. Dalam teori automata, sebuah regex tidak hanya dianggap sebagai sintaks pencarian string, tetapi juga sebagai representasi aljabar dari language yang dibentuk oleh simbol dasar, operasi union, concatenation, dan Kleene star \cite{hopcroft2006automata}.
 
-Pada aplikasi ini, RegEx relevan untuk menangkap pola seperti kata yang diikuti angka, misalnya bentuk yang sengaja dimodifikasi agar tidak sama persis dengan keyword di daftar utama. Dibandingkan exact matching, pendekatan ini lebih fleksibel, tetapi perlu dibatasi dengan hati-hati agar tidak menghasilkan terlalu banyak false positive.
+Secara formal, misalkan $\Sigma$ adalah alfabet. Definisi regex dapat dibangun secara rekursif sebagai berikut. $\emptyset$, $\varepsilon$, dan setiap simbol $a \in \Sigma$ adalah regular expression. Jika $r$ dan $s$ adalah regular expression, maka operasi formal utamanya adalah
+
+\begin{enumerate}
+    \item $r + s$ atau $r \mid s$, yaitu \textit{union}, yang membentuk language berisi string dari salah satu komponen.
+    \item $rs$, yaitu \textit{concatenation}, yang membentuk string dengan bahasa pertama diikuti bahasa kedua.
+    \item $r^*$, yaitu \textit{Kleene star}, yang membentuk semua pengulangan nol kali atau lebih dari bahasa dasar.
+    \item $r^+$, yaitu satu atau lebih pengulangan dari bahasa dasar.
+    \item $r?$ , yaitu bentuk opsional yang menerima nol atau satu kemunculan.
+\end{enumerate}
+
+Setiap regex $r$ merepresentasikan language $L(r)$, yaitu himpunan semua string yang diterima oleh ekspresi tersebut. Hubungan ini menjadikan RegEx sebagai bentuk ringkas untuk mendeskripsikan pola string tanpa menuliskan seluruh kemungkinan string secara eksplisit \cite{hopcroft2006automata,mdnregexp}. Pada implementasi praktis, operasi seperti grouping dengan kurung, character class, anchor, dan quantifier memperluas ekspresi formal ini ke notasi yang lebih ergonomis untuk pencocokan teks. Karena itu, aturan sintaks RegEx modern sebenarnya tetap berakar pada operasi formal bahasa reguler.
+
+
+Pada aplikasi ini, RegEx relevan untuk menangkap pola seperti kata yang diikuti angka, misalnya bentuk yang sengaja dimodifikasi agar tidak sama persis dengan keyword di daftar utama. Dibandingkan exact matching, pendekatan ini lebih fleksibel, tetapi perlu dibatasi dengan hati-hati agar tidak menghasilkan terlalu banyak false positive. Dengan kata lain, RegEx dipakai ketika sistem ingin mengekspresikan pola secara lebih umum daripada daftar kata kunci statis.
+
+Contoh regex sederhana adalah \texttt{a\*b}, yang menerima string \texttt{b}, \texttt{ab}, \texttt{aab}, dan \texttt{aaab}, karena simbol \texttt{a} boleh muncul nol kali atau lebih sebelum \texttt{b}. Contoh lainnya adalah \texttt{(ab)+}, yang menerima \texttt{ab}, \texttt{abab}, dan \texttt{ababab}. Contoh yang lebih kompleks adalah \texttt{[A-Za-z]+\textbackslash d{2,3}}, yang dapat mencocokkan string seperti \texttt{MAXWIN99}, \texttt{slot123}, atau \texttt{Bonus202}, karena pola tersebut meminta satu atau lebih huruf yang diikuti dua sampai tiga digit. Untuk contoh berbasis anchor, regex \texttt{\^gacor\$} hanya menerima string \texttt{gacor} tanpa karakter tambahan di depan atau belakang.
+
 
 \section{Fuzzy Matching}
 
