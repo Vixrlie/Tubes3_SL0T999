@@ -1,0 +1,140 @@
+\section{Analisis Pemecahan Masalah}
+
+Permasalahan pada spesifikasi dipecahkan menjadi rancangan solusi sesuai implementasi pada codebase ini. Cakupan analisis berupa alur pemindaian, pemetaan algoritma pencocokan, dan visualisasi hasil.
+
+\subsection{Rumusan Masalah Teknis}
+
+Berdasarkan spesifikasi dan landasan teori, permasalahan dapat dirumuskan menjadi beberapa poin teknis berikut.
+
+\begin{enumerate}
+    \item Sistem harus mendeteksi kata kunci judol pada teks halaman web dengan exact matching menggunakan algoritma from scratch.
+    \item Sistem harus menangkap pola umum \texttt{<kata><angka>} yang bervariasi dengan RegEx.
+    \item Sistem harus tetap mendeteksi manipulasi karakter visual-similar melalui fuzzy matching berbasis weighted Levenshtein distance.
+    \item Sistem harus menandai elemen target secara presisi tanpa merusak layout halaman.
+    \item Sistem harus menyajikan statistik real-time di popup, termasuk jumlah match dan waktu eksekusi tiap algoritma.
+    \item Sistem harus dapat melakukan OCR untuk gambar, lalu memasukkan hasil OCR ke pipeline deteksi yang sama.
+\end{enumerate}
+
+\subsection{Langkah Pemecahan Masalah}
+
+Pemecahan masalah pada implementasi ini dilakukan melalui pipeline berlapis, dari akuisisi data halaman hingga visualisasi hasil.
+
+\begin{enumerate}
+    \item Akuisisi target halaman dengan \texttt{TreeWalker} untuk node teks dan \texttt{querySelectorAll('img')} untuk gambar.
+    \item Normalisasi teks dan filtering elemen yang tidak relevan, seperti \texttt{script}, \texttt{style}, elemen tersembunyi, dan UI internal extension.
+    \item Pembentukan \texttt{DetectionContext} yang memuat URL, teks halaman, timestamp, dan daftar target.
+    \item Eksekusi engine deteksi secara berurutan: KMP, Boyer-Moore, Aho-Corasick, Rabin-Karp, RegEx, lalu Fuzzy.
+    \item Penyatuan hasil match menjadi satu \texttt{DetectionResult}, termasuk agregasi waktu eksekusi.
+    \item Penerapan highlight, tooltip, dan blur opsional pada elemen yang terdeteksi.
+    \item Penyimpanan statistik ke \texttt{chrome.storage.local} agar popup dan badge dapat diperbarui secara sinkron.
+\end{enumerate}
+
+Alur ini dirancang agar requirement wajib tetap terpenuhi, sekaligus menjaga extension responsif pada perubahan DOM melalui mekanisme auto-rescan berbasis \texttt{MutationObserver}.
+
+\subsection{Pemetaan Masalah ke Elemen Algoritma}
+
+\subsubsection{Exact Matching dari \texttt{keywords.txt}}
+
+Pada codebase ini, exact matching tidak hanya memakai dua algoritma wajib, tetapi juga dua algoritma bonus.
+
+\begin{itemize}
+    \item KMP diimplementasikan melalui \texttt{buildFailureFunction()} dan \texttt{kmpSearch()}.
+    \item Boyer-Moore diimplementasikan melalui \texttt{buildLastOccurrenceTable()}, \texttt{buildGoodSuffixTable()}, dan \texttt{boyerMooreSearch()}.
+    \item Aho-Corasick membangun trie, failure link, dan output traversal untuk multi-pattern matching.
+    \item Rabin-Karp menggunakan rolling hash dengan verifikasi karakter saat hash cocok.
+\end{itemize}
+
+Semua keyword dibaca dari \texttt{public/keywords/keywords.txt} melalui \texttt{loadKeywords()}, lalu dinormalisasi ke lowercase agar konsisten antar engine.
+
+\subsubsection{RegEx Matching}
+
+Pola RegEx yang digunakan adalah:
+\verb|[\p{L}][\p{L}\p{M}\p{N}'._-]*\d{2,3}|
+
+Implementasi ini dirancang untuk menangkap token berbentuk kata yang diikuti 2 sampai 3 digit, lalu divalidasi ulang dengan pemeriksaan boundary kiri dan kanan agar false positive lebih rendah.
+
+\subsubsection{Fuzzy Matching}
+
+Fuzzy matching dijalankan setelah exact matching. Pada implementasi \texttt{createFuzzyEngine()}, keyword yang sudah terdeteksi exact disimpan sebagai \texttt{exactMatchedKeywords} sehingga tidak dihitung ulang pada fase fuzzy.
+
+Weighted Levenshtein memakai bobot substitusi kecil untuk pasangan visual-similar, misalnya:
+\begin{itemize}
+    \item \texttt{o} dengan \texttt{0} bernilai 0.2
+    \item \texttt{i} dengan \texttt{1} bernilai 0.2
+    \item \texttt{a} dengan \texttt{4} bernilai 0.2
+    \item \texttt{a} dengan karakter alpha Yunani bernilai 0.1
+\end{itemize}
+
+Skor akhir dinormalisasi dengan:
+\[
+    \text{score}=\frac{\text{distance}}{\max(|token|,|keyword|)}
+\]
+dengan threshold default 0.35.
+
+\subsection{Analisis Arsitektur Fungsional Extension}
+
+Secara implementasi, arsitektur dibagi menjadi tiga komponen utama.
+
+\begin{enumerate}
+    \item \textbf{Content script} (\texttt{src/content/content.ts}) sebagai inti pipeline deteksi dan rendering highlight.
+    \item \textbf{Popup} (\texttt{src/popup/popup.ts}) sebagai antarmuka kontrol scan, toggle blur, toggle OCR, dan statistik.
+    \item \textbf{Background service worker} (\texttt{src/background/background.ts}) untuk sinkronisasi badge berdasarkan \texttt{totalKeywords}.
+\end{enumerate}
+
+\subsubsection{Alur Data Antar Komponen}
+
+\begin{enumerate}
+    \item Pengguna menekan tombol \texttt{Scan Now} pada popup.
+    \item Popup mengirim pesan \texttt{"scan-now"} ke tab aktif.
+    \item Content script menjalankan \texttt{runScan(includeOcr)}.
+    \item Hasil disimpan ke \texttt{chrome.storage.local} sebagai \texttt{PopupStats}.
+    \item Popup membaca ulang storage dan me-render grafik jumlah match serta waktu eksekusi.
+    \item Background membaca perubahan \texttt{totalKeywords} lalu memperbarui badge ikon extension.
+\end{enumerate}
+
+\subsubsection{Strategi Pengolahan DOM}
+
+Strategi pemindaian DOM menggunakan pendekatan hybrid:
+\begin{itemize}
+    \item Jalur teks: \texttt{collectScanTargets()} memilih kontainer teks yang bermakna dan terlihat.
+    \item Jalur gambar: \texttt{collectImageTargets()} memilih gambar valid, visible, dan bukan bagian UI internal extension.
+\end{itemize}
+
+Untuk menjaga stabilitas auto-scan, observer menghindari scan beruntun saat:
+\begin{itemize}
+    \item perubahan berasal dari UI internal extension,
+    \item pengguna sedang scroll (scroll suppression),
+    \item tooltip sedang aktif.
+\end{itemize}
+
+\subsection{Ilustrasi Kasus Analisis}
+
+Contoh kasus uji konseptual:
+\begin{quote}
+Halaman memuat teks ``H0KI88 lagi promo'' dan ``MAXWIN234'', serta satu banner gambar yang setelah OCR terbaca ``GAC0R99''.
+\end{quote}
+
+Analisis hasil pipeline:
+\begin{enumerate}
+    \item Token \texttt{MAXWIN234} tertangkap oleh engine RegEx sebagai source \texttt{regex}.
+    \item Token \texttt{H0KI88} dapat terdeteksi melalui fuzzy matching jika keyword dasar yang relevan tidak ditemukan secara exact.
+    \item Teks OCR \texttt{GAC0R99} diproses pada jalur OCR, lalu dibandingkan exact dan fuzzy terhadap keyword yang sama.
+    \item Setiap temuan akan mengikat \texttt{targetIndex}, sehingga highlight dan tooltip ditempatkan tepat pada elemen sumber.
+    \item Statistik popup menampilkan total gabungan, per algoritma, dan waktu eksekusi masing-masing engine.
+\end{enumerate}
+
+Ilustrasi ini menunjukkan bahwa sistem tidak bergantung pada satu metode tunggal, tetapi menggabungkan exact, rule-based, fuzzy, dan OCR agar robust pada pola manipulatif.
+
+\subsection{Analisis Kesesuaian Terhadap Spesifikasi}
+
+Secara fungsional, implementasi sudah memetakan kebutuhan utama spesifikasi ke modul yang jelas:
+\begin{itemize}
+    \item exact matching from scratch: terpenuhi oleh KMP dan Boyer-Moore, ditambah Aho-Corasick dan Rabin-Karp,
+    \item RegEx untuk pola \texttt{<kata><angka>}: terpenuhi dengan boundary checking,
+    \item fuzzy matching weighted: terpenuhi dengan matriks biaya substitusi dan threshold,
+    \item highlight serta tooltip custom DOM: terpenuhi melalui \texttt{highlighter.ts} dan \texttt{tooltip.ts},
+    \item statistik realtime popup: terpenuhi melalui sinkronisasi \texttt{content.ts}, \texttt{popup.ts}, dan \texttt{background.ts},
+    \item bonus OCR dan blur: terpenuhi melalui \texttt{ocr.ts}, toggle popup, serta fungsi \texttt{applyBlur()}.
+\end{itemize}
+
+Dengan demikian, analisis menunjukkan bahwa rancangan solusi pada proyek ini konsisten antara kebutuhan spesifikasi, teori algoritma, dan realisasi implementasi pada codebase.
