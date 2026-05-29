@@ -1,4 +1,12 @@
 \section{Kesimpulan}
 
+Berdasarkan perancangan dan implementasi yang telah dilakukan, extension \textit{Judol Detector} berhasil memanfaatkan pendekatan \textit{pattern matching} untuk mendeteksi variasi konten yang relevan pada halaman web. Algoritma exact matching seperti KMP, Boyer-Moore, Aho-Corasick, dan Rabin-Karp digunakan untuk menangani karakteristik pencocokan yang berbeda, sedangkan RegEx dan fuzzy matching memperluas kemampuan sistem dalam menghadapi variasi teks, manipulasi karakter visual-similar, dan pola yang tidak selalu identik. Dengan dukungan OCR, sistem juga dapat memeriksa teks yang tertanam pada gambar sehingga proses deteksi menjadi lebih menyeluruh.
+
+Secara arsitektural, pembagian tanggung jawab antara content script, popup, dan background service worker membuat proses pemindaian, penyimpanan state, dan pembaruan antarmuka berjalan lebih terstruktur. Pendekatan hybrid scan pada DOM juga membantu sistem memisahkan target teks dan gambar secara lebih efektif, sehingga hasil deteksi dapat ditampilkan kembali ke pengguna melalui highlight, blur, badge, dan statistik yang konsisten.
+
 \section{Saran}
+
+Untuk pengembangan selanjutnya, sistem dapat diperluas dengan menambahkan normalisasi teks yang lebih agresif, misalnya terhadap variasi spasi, simbol, dan karakter Unicode yang mirip secara visual. Selain itu, optimasi OCR dan penyaringan elemen DOM masih dapat ditingkatkan agar biaya pemindaian pada halaman yang sangat besar menjadi lebih ringan.
+
+Saran lainnya adalah menambahkan mekanisme evaluasi yang lebih formal, misalnya pengukuran precision, recall, dan false positive rate terhadap dataset yang lebih beragam. Dari sisi fitur, extension juga dapat dikembangkan dengan konfigurasi ambang fuzzy matching yang dapat diatur pengguna, dukungan pencarian berbasis frasa atau konteks, serta visualisasi hasil yang lebih informatif agar pengguna lebih mudah memahami alasan suatu elemen ditandai.
 
